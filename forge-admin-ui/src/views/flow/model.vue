@@ -23,6 +23,10 @@
         </div>
       </div>
       <div class="header-right">
+        <n-button type="primary" @click="handleAdd">
+          <i class="i-material-symbols:add mr-2" />
+          新增模型
+        </n-button>
         <n-input
           v-model:value="queryParams.modelName"
           placeholder="搜索模型名称或 Key"
@@ -32,12 +36,107 @@
         >
           <template #prefix>
             <i class="i-material-symbols:search" />
-</template>
+          </template>
+        </n-input>
+        <n-select
+          v-model:value="queryParams.category"
+          placeholder="流程分类"
+          clearable
+          class="category-select"
+          :options="categoryOptions"
+        />
+        <n-select
+          v-model:value="queryParams.status"
+          placeholder="状态"
+          clearable
+          class="status-select"
+          :options="statusOptions"
+        />
+        <n-button @click="handleSearch">
+          <i class="i-material-symbols:search mr-2" />
+          搜索
+        </n-button>
+        <n-button @click="handleReset">
+          <i class="i-material-symbols:refresh mr-2" />
+          重置
+        </n-button>
+      </div>
+    </div>
 
-    <VersionHistory v-if="showVersionHistory" :model-id="currentModelId" @close="showVersionHistory = false" />
-  </div>
-</template>
-                </NButton>
+    <!-- 模型列表 -->
+    <n-spin :show="loading" class="model-list-spin">
+      <div v-if="dataSource.length > 0" class="model-grid">
+        <div
+          v-for="item in dataSource"
+          :key="item.id"
+          class="model-card"
+          @click="handleDesign(item)"
+        >
+          <div class="card-header">
+            <div class="card-icon" :class="iconClass(item)">
+              <i :class="iconName(item)" />
+            </div>
+            <span class="status-tag" :class="statusClass(item.status)">
+              {{ statusText[item.status] }}
+            </span>
+          </div>
+          <div class="card-body">
+            <div class="card-title">
+              {{ item.modelName }}
+            </div>
+            <div class="card-key">
+              {{ item.modelKey }}
+            </div>
+            <div class="card-desc">
+              {{ item.description || '暂无描述' }}
+            </div>
+          </div>
+          <div class="card-footer">
+            <div class="card-meta">
+              <div class="meta-item">
+                <i class="i-material-symbols:history-outline" />
+                {{ formatDate(item.updateTime) }}
+              </div>
+              <div class="meta-item">
+                <i class="i-material-symbols:deployed-code-outline" />
+                v{{ item.version || 1 }}
+              </div>
+            </div>
+            <div class="card-actions">
+              <n-button
+                size="small"
+                type="primary"
+                secondary
+                @click.stop="handleDesign(item)"
+              >
+                <i class="i-material-symbols:edit-outline mr-1" />
+                设计
+              </n-button>
+              <n-button
+                v-if="item.status === 0"
+                size="small"
+                type="primary"
+                @click.stop="handleDeploy(item)"
+              >
+                部署
+              </n-button>
+              <n-button
+                v-else-if="item.status === 1"
+                size="small"
+                @click.stop="handleViewInstances(item)"
+              >
+                查看实例
+              </n-button>
+              <n-dropdown
+                trigger="click"
+                :options="getActionOptions(item)"
+                @select="key => handleActionSelect(key, item)"
+              >
+                <n-button size="small" @click.stop>
+                  <template #icon>
+                    <NIcon><EllipsisVertical /></NIcon>
+                  </template>
+                </n-button>
               </n-dropdown>
             </div>
           </div>
@@ -51,10 +150,10 @@
         class="empty-state"
       >
         <template #extra>
-          <NButton type="primary" @click="handleAdd">
+          <n-button type="primary" @click="handleAdd">
             <i class="i-material-symbols:add mr-2" />
             新增模型
-          </NButton>
+          </n-button>
         </template>
       </n-empty>
     </n-spin>
@@ -174,15 +273,24 @@
       </n-modal>
     </Teleport>
 
-    <VersionHistory v-if="showVersionHistory" :model-id="currentModelId" @close="showVersionHistory = false" />
+    <VersionHistory
+      v-if="showVersionHistory"
+      :model-id="currentModelId"
+      :current-version="currentModelVersion"
+      @close="showVersionHistory = false"
+      @refresh="fetchData"
+    />
   </div>
 </template>
 
 <script setup>
+import { CopyOutline, CreateOutline, EllipsisVertical, PauseCircleOutline, PlayCircleOutline, TimeOutline, TrashOutline } from '@vicons/ionicons5'
+import { NIcon } from 'naive-ui'
 import { h, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import flowApi from '@/api/flow'
 import FlowModelStats from '@/components/flow/FlowModelStats.vue'
+import VersionHistory from './version.vue'
 
 const router = useRouter()
 
@@ -242,19 +350,22 @@ function formatDate(d) {
 }
 
 function getActionOptions(row) {
+  const renderIcon = (icon) => {
+    return () => h(NIcon, null, { default: () => h(icon) })
+  }
   const opts = [
-    { label: '编辑信息', key: 'edit', icon: () => h('i', { class: 'i-material-symbols:edit-outline' }) },
-    { label: '版本历史', key: 'versionHistory', icon: () => h('i', { class: 'i-material-symbols:history-outline' }) },
-    { label: '复制模型', key: 'copy', icon: () => h('i', { class: 'i-material-symbols:content-copy-outline' }) },
+    { label: '编辑信息', key: 'edit', icon: renderIcon(CreateOutline) },
+    { label: '版本历史', key: 'versionHistory', icon: renderIcon(TimeOutline) },
+    { label: '复制模型', key: 'copy', icon: renderIcon(CopyOutline) },
   ]
   if (row.status === 1) {
-    opts.push({ label: '挂起', key: 'suspend', icon: () => h('i', { class: 'i-material-symbols:pause-circle-outline' }) })
+    opts.push({ label: '挂起', key: 'suspend', icon: renderIcon(PauseCircleOutline) })
   }
   if (row.status === 2) {
-    opts.push({ label: '激活', key: 'activate', icon: () => h('i', { class: 'i-material-symbols:play-circle-outline' }) })
+    opts.push({ label: '激活', key: 'activate', icon: renderIcon(PlayCircleOutline) })
   }
   opts.push({ type: 'divider', key: 'd1' })
-  opts.push({ label: '删除', key: 'delete', props: { style: 'color: #d03050' } })
+  opts.push({ label: '删除', key: 'delete', icon: renderIcon(TrashOutline), props: { style: 'color: #d03050' } })
   return opts
 }
 
@@ -269,6 +380,7 @@ const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 12, itemCount: 0 })
 const showVersionHistory = ref(false)
 const currentModelId = ref('')
+const currentModelVersion = ref(null)
 
 const totalCount = ref(0)
 const designingCount = ref(0)
@@ -501,6 +613,7 @@ async function handleDelete(row) {
 
 function handleVersionHistory(row) {
   currentModelId.value = row.id
+  currentModelVersion.value = row.version
   showVersionHistory.value = true
 }
 
@@ -594,10 +707,11 @@ onMounted(() => {
   min-height: 0;
   overflow: auto;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   align-content: start;
   gap: 12px;
   padding: 1px 1px 4px;
+  max-width: 100%;
 }
 
 .model-card {
@@ -825,17 +939,7 @@ onMounted(() => {
   min-height: 0;
 }
 
-@media (max-width: 1500px) {
-  .model-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 1180px) {
-  .model-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .header-right {
     overflow-x: auto;
     padding-bottom: 2px;
@@ -851,10 +955,6 @@ onMounted(() => {
   .category-select,
   .status-select {
     width: 160px;
-  }
-
-  .model-grid {
-    grid-template-columns: 1fr;
   }
 }
 </style>

@@ -1,7 +1,10 @@
-package com.mdframe.forge.starter.flow.controller;
+package com.mdframe.forge.flow.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.mdframe.forge.starter.core.annotation.crypto.ApiDecrypt;
+import com.mdframe.forge.starter.core.annotation.crypto.ApiEncrypt;
+import com.mdframe.forge.starter.core.annotation.tenant.IgnoreTenant;
 import com.mdframe.forge.starter.core.domain.RespInfo;
 import com.mdframe.forge.starter.flow.dto.VersionCompareDTO;
 import com.mdframe.forge.starter.flow.dto.VersionRevertDTO;
@@ -12,15 +15,20 @@ import com.mdframe.forge.starter.flow.vo.VersionCompareVO;
 import com.mdframe.forge.starter.flow.vo.VersionDetailVO;
 import com.mdframe.forge.starter.flow.vo.VersionRevertVO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.servlet.http.HttpServletResponse;
-import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
 @RestController
-@RequestMapping("/flow/model/version")
+@RequestMapping("/api/flow/model/version")
 @RequiredArgsConstructor
+@ApiDecrypt
+@ApiEncrypt
+@IgnoreTenant
 public class FlowModelVersionController {
 
     private final FlowModelVersionService flowModelVersionService;
@@ -46,7 +54,8 @@ public class FlowModelVersionController {
 
     @PostMapping("/revert")
     public RespInfo<VersionRevertVO> revertVersion(@RequestBody VersionRevertDTO dto) {
-        return RespInfo.success(flowModelVersionService.revertVersion(dto));
+        VersionRevertVO vo = flowModelVersionService.revertVersion(dto);
+        return RespInfo.success("回退成功，正在运行的 " + vo.getRunningInstances() + " 个实例将继续按旧版本执行", vo);
     }
 
     @PutMapping("/{versionId}/tag")
@@ -62,19 +71,26 @@ public class FlowModelVersionController {
     }
 
     @GetMapping("/download/{versionId}")
-    public void downloadVersion(@PathVariable String versionId, HttpServletResponse response) {
-        try {
-            VersionDetailVO version = flowModelVersionService.getVersionDetail(versionId);
-
-            response.setContentType("application/xml");
-            response.setHeader("Content-Disposition", "attachment;filename=" + version.getVersionName() + ".bpmn20.xml");
-
-            OutputStream out = response.getOutputStream();
-            out.write(version.getBpmnXml().getBytes(StandardCharsets.UTF_8));
-            out.flush();
-            out.close();
-        } catch (Exception e) {
-            throw new RuntimeException("下载失败：" + e.getMessage());
+    public ResponseEntity<byte[]> downloadVersion(@PathVariable String versionId) {
+        VersionDetailVO version = flowModelVersionService.getVersionDetail(versionId);
+        if (version.getBpmnXml() == null || version.getBpmnXml().isBlank()) {
+            throw new RuntimeException("该版本没有 BPMN XML，无法下载");
         }
+
+        String filename = (version.getVersionName() == null || version.getVersionName().isBlank())
+                ? "version-" + version.getVersion()
+                : version.getVersionName();
+        byte[] content = version.getBpmnXml().getBytes(StandardCharsets.UTF_8);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType("application/xml;charset=UTF-8"));
+        headers.setContentDisposition(ContentDisposition.attachment()
+                .filename(filename + ".bpmn20.xml", StandardCharsets.UTF_8)
+                .build());
+        headers.setContentLength(content.length);
+
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(content);
     }
 }

@@ -1,71 +1,141 @@
 <template>
-  <n-modal v-model:show="visible" preset="card" title="版本对比" style="width: 1000px">
-    <n-space vertical>
-      <n-select v-model:value="version1" :options="versionOptions" placeholder="选择版本1" />
-      <n-select v-model:value="version2" :options="versionOptions" placeholder="选择版本2" />
-      <n-button type="primary" @click="handleCompare">对比</n-button>
-      <n-divider />
+  <NModal
+    v-model:show="visible"
+    preset="card"
+    title="版本对比"
+    style="width: 1000px"
+    @update:show="handleVisibleUpdate"
+  >
+    <NSpace vertical>
+      <NSelect v-model:value="version1" :options="versionOptions" placeholder="选择版本1" />
+      <NSelect v-model:value="version2" :options="versionOptions" placeholder="选择版本2" />
+      <NButton type="primary" @click="handleCompare">
+        对比
+      </NButton>
+      <NDivider />
       <div v-if="diffResult">
-        <n-h3>差异结果</n-h3>
-        <n-space vertical>
+        <NH3>差异结果</NH3>
+        <NSpace vertical>
+          <NEmpty v-if="isEmptyDiff" description="两个版本未检测到节点或连线差异" />
           <div v-if="diffResult.addedNodes?.length">
-            <n-text strong>新增节点：</n-text>
-            <n-list>
-              <n-list-item v-for="node in diffResult.addedNodes">
+            <NText strong>
+              新增节点：
+            </NText>
+            <NList>
+              <NListItem v-for="node in diffResult.addedNodes" :key="node.id">
                 {{ node.name }} ({{ node.id }})
-              </n-list-item>
-            </n-list>
+              </NListItem>
+            </NList>
           </div>
           <div v-if="diffResult.modifiedNodes?.length">
-            <n-text strong>修改节点：</n-text>
-            <n-list>
-              <n-list-item v-for="node in diffResult.modifiedNodes">
+            <NText strong>
+              修改节点：
+            </NText>
+            <NList>
+              <NListItem v-for="node in diffResult.modifiedNodes" :key="node.id">
                 {{ node.oldName }} → {{ node.newName }}
-              </n-list-item>
-            </n-list>
+              </NListItem>
+            </NList>
           </div>
           <div v-if="diffResult.deletedNodes?.length">
-            <n-text strong>删除节点：</n-text>
-            <n-list>
-              <n-list-item v-for="node in diffResult.deletedNodes">
+            <NText strong>
+              删除节点：
+            </NText>
+            <NList>
+              <NListItem v-for="node in diffResult.deletedNodes" :key="node.id">
                 {{ node.name }} ({{ node.id }})
-              </n-list-item>
-            </n-list>
+              </NListItem>
+            </NList>
           </div>
-        </n-space>
+          <div v-if="diffResult.addedFlows?.length">
+            <NText strong>
+              新增连线：
+            </NText>
+            <NList>
+              <NListItem v-for="flow in diffResult.addedFlows" :key="flow.id">
+                {{ flow.id }}：{{ flow.source }} → {{ flow.target }}
+              </NListItem>
+            </NList>
+          </div>
+          <div v-if="diffResult.modifiedFlows?.length">
+            <NText strong>
+              修改连线：
+            </NText>
+            <NList>
+              <NListItem v-for="flow in diffResult.modifiedFlows" :key="flow.id">
+                {{ flow.id }}：{{ flow.oldSource }} → {{ flow.oldTarget }} 改为 {{ flow.newSource }} → {{ flow.newTarget }}
+              </NListItem>
+            </NList>
+          </div>
+          <div v-if="diffResult.deletedFlows?.length">
+            <NText strong>
+              删除连线：
+            </NText>
+            <NList>
+              <NListItem v-for="flow in diffResult.deletedFlows" :key="flow.id">
+                {{ flow.id }}：{{ flow.source }} → {{ flow.target }}
+              </NListItem>
+            </NList>
+          </div>
+        </NSpace>
       </div>
-    </n-space>
-  </n-modal>
+    </NSpace>
+  </NModal>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import versionApi from '@/api/version'
 
 const props = defineProps({
-  modelId: String,
+  modelId: {
+    type: [String, Number],
+    required: true,
+  },
 })
+const emit = defineEmits(['close'])
 
 const visible = ref(true)
 const version1 = ref(null)
 const version2 = ref(null)
 const versionOptions = ref([])
 const diffResult = ref(null)
+const isEmptyDiff = computed(() => {
+  if (!diffResult.value)
+    return false
+  return !diffResult.value.addedNodes?.length
+    && !diffResult.value.modifiedNodes?.length
+    && !diffResult.value.deletedNodes?.length
+    && !diffResult.value.addedFlows?.length
+    && !diffResult.value.modifiedFlows?.length
+    && !diffResult.value.deletedFlows?.length
+})
 
-const loadVersionOptions = async () => {
+function handleVisibleUpdate(show) {
+  if (!show)
+    emit('close')
+}
+
+async function loadVersionOptions() {
   try {
     const res = await versionApi.getVersionList(props.modelId, 1, 100)
     versionOptions.value = (res.data?.records || []).map(v => ({
       label: `${v.versionName} (${v.publishTime})`,
       value: v.version,
     }))
-  } catch (error) {
+  }
+  catch (error) {
     console.error('加载版本列表失败', error)
   }
 }
 
-const handleCompare = async () => {
+async function handleCompare() {
   if (!version1.value || !version2.value) {
+    window.$message?.warning('请选择两个版本')
+    return
+  }
+  if (version1.value === version2.value) {
+    window.$message?.warning('请选择两个不同版本')
     return
   }
   try {
@@ -75,7 +145,8 @@ const handleCompare = async () => {
       version2: version2.value,
     })
     diffResult.value = res.data
-  } catch (error) {
+  }
+  catch (error) {
     console.error('版本对比失败', error)
   }
 }

@@ -27,11 +27,28 @@
     </sql>
 
     <select id="pageByVersion" resultMap="BaseResultMap">
-        SELECT <include refid="Base_Column_List"/>
-        FROM sys_flow_model_version
-        WHERE model_id = #{modelId}
-          AND del_flag = 0
-        ORDER BY version DESC
+        SELECT
+            v.id,
+            v.model_id,
+            v.version,
+            v.version_name,
+            v.version_tag,
+            v.bpmn_xml,
+            v.form_json,
+            v.change_description,
+            v.deployment_id,
+            v.process_definition_id,
+            COALESCE(NULLIF(u.real_name, ''), v.publish_by) AS publish_by,
+            v.publish_time,
+            v.tenant_id,
+            v.create_time,
+            v.del_flag
+        FROM sys_flow_model_version v
+        LEFT JOIN sys_user u ON u.username = v.publish_by
+            AND u.tenant_id = v.tenant_id
+        WHERE v.model_id = #{modelId}
+          AND v.del_flag = 0
+        ORDER BY v.version DESC
     </select>
 
     <select id="getMaxVersion" resultType="java.lang.Integer">
@@ -42,9 +59,35 @@
     </select>
 
     <select id="getVersionDetail" resultMap="BaseResultMap">
+        SELECT
+            v.id,
+            v.model_id,
+            v.version,
+            v.version_name,
+            v.version_tag,
+            v.bpmn_xml,
+            v.form_json,
+            v.change_description,
+            v.deployment_id,
+            v.process_definition_id,
+            COALESCE(NULLIF(u.real_name, ''), v.publish_by) AS publish_by,
+            v.publish_time,
+            v.tenant_id,
+            v.create_time,
+            v.del_flag
+        FROM sys_flow_model_version v
+        LEFT JOIN sys_user u ON u.username = v.publish_by
+            AND u.tenant_id = v.tenant_id
+        WHERE v.id = #{versionId}
+          AND v.del_flag = 0
+    </select>
+
+    <select id="getVersionByModelAndVersion" resultMap="BaseResultMap">
         SELECT <include refid="Base_Column_List"/>
         FROM sys_flow_model_version
-        WHERE id = #{versionId}
+        WHERE model_id = #{modelId}
+          AND version = #{version}
           AND del_flag = 0
+        LIMIT 1
     </select>
 </mapper>

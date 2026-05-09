@@ -27,6 +27,12 @@
         </NTag>
       </div>
       <div class="top-bar-right">
+        <n-button @click="handleOpenVersionHistory">
+          <template #icon>
+            <i class="i-material-symbols:history" />
+          </template>
+          更改记录
+        </n-button>
         <n-button :type="aiPanelVisible ? 'primary' : 'default'" @click="toggleAiPanel">
           <template #icon>
             <i class="i-material-symbols:auto-awesome" />
@@ -461,6 +467,14 @@
         </div>
       </n-modal>
     </Teleport>
+
+    <VersionHistory
+      v-if="showVersionHistory"
+      :model-id="modelInfo.id"
+      :current-version="modelInfo.version"
+      @close="showVersionHistory = false"
+      @refresh="handleVersionHistoryRefresh"
+    />
   </div>
 </template>
 
@@ -475,6 +489,7 @@ import FlowModeler from '@/components/bpmn/FlowModeler.vue'
 import NodePropertiesPanel from '@/components/bpmn/NodePropertiesPanel.vue'
 import FormDesigner from '@/components/form-designer/FormDesigner.vue'
 import FormPreview from '@/components/form-designer/FormPreview.vue'
+import VersionHistory from './version.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -494,6 +509,7 @@ const aiSessionId = ref('')
 const aiMessages = ref([])
 const aiDraft = ref(null)
 const showAiXmlPreview = ref(false)
+const showVersionHistory = ref(false)
 const aiAbortController = ref(null)
 const aiRawContent = ref('')
 const aiReasoningContent = ref('')
@@ -529,6 +545,7 @@ const modelInfo = reactive({
   formJson: '',
   description: '',
   status: 0,
+  version: 1,
   startListener: '',
   endListener: '',
 })
@@ -730,6 +747,26 @@ async function loadModel(id) {
   catch (error) {
     console.error('加载模型失败:', error)
   }
+}
+
+function handleOpenVersionHistory() {
+  if (!modelInfo.id) {
+    window.$message?.warning('请先保存模型后查看更改记录')
+    return
+  }
+  showVersionHistory.value = true
+}
+
+async function handleVersionHistoryRefresh() {
+  if (!modelInfo.id)
+    return
+
+  await loadModel(modelInfo.id)
+  await nextTick()
+  if (bpmnXml.value) {
+    await modelerRef.value?.setXML(bpmnXml.value)
+  }
+  hasChanges.value = false
 }
 
 function handleFormTypeChange(value) {
@@ -1488,7 +1525,7 @@ async function handleDeploy() {
     const res = await flowApi.deployModel(modelInfo.id)
     if (res.code === 200) {
       window.$message?.success('部署成功')
-      modelInfo.status = 1
+      await loadModel(modelInfo.id)
     }
     else {
       window.$message?.error(res.message || '部署失败')

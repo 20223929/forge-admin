@@ -15,4 +15,6 @@ public interface FlowModelVersionMapper extends BaseMapper<FlowModelVersion> {
     Integer getMaxVersion(@Param("modelId") String modelId);
 
     FlowModelVersion getVersionDetail(@Param("versionId") String versionId);
+
+    FlowModelVersion getVersionByModelAndVersion(@Param("modelId") String modelId, @Param("version") Integer version);
 }

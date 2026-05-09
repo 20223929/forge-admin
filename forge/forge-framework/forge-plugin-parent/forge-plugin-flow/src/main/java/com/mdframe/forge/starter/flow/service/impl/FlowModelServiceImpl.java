@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.mdframe.forge.starter.core.session.SessionHelper;
 import com.mdframe.forge.starter.flow.entity.FlowModel;
 import com.mdframe.forge.starter.flow.mapper.FlowModelMapper;
 import com.mdframe.forge.starter.flow.service.FlowModelService;
@@ -83,7 +84,7 @@ public class FlowModelServiceImpl extends ServiceImpl<FlowModelMapper, FlowModel
         flowModel.setDelFlag(0);
         flowModel.setCreateTime(LocalDateTime.now());
         flowModel.setUpdateTime(LocalDateTime.now());
-        
+        flowModel.setCreateBy(SessionHelper.getLoginUser().getUsername());
         save(flowModel);
         log.info("创建流程模型成功：{}", flowModel.getModelKey());
         return flowModel;
@@ -101,7 +102,7 @@ public class FlowModelServiceImpl extends ServiceImpl<FlowModelMapper, FlowModel
         if (existing.getStatus() == 1 && !existing.getModelKey().equals(flowModel.getModelKey())) {
             throw new RuntimeException("已发布的模型不允许修改Key");
         }
-        
+        flowModel.setLastUpdateBy(SessionHelper.getLoginUser().getUsername());
         flowModel.setUpdateTime(LocalDateTime.now());
         updateById(flowModel);
         log.info("更新流程模型成功：{}", flowModel.getModelKey());
@@ -452,7 +453,7 @@ public class FlowModelServiceImpl extends ServiceImpl<FlowModelMapper, FlowModel
         model.setDelFlag(0);
         model.setCreateTime(LocalDateTime.now());
         model.setUpdateTime(LocalDateTime.now());
-        
+        model.setCreateBy(SessionHelper.getLoginUser().getUsername());
         save(model);
         log.info("导入流程模型成功：{}", model.getModelKey());
         return model;
@@ -491,6 +492,7 @@ public class FlowModelServiceImpl extends ServiceImpl<FlowModelMapper, FlowModel
         newModel.setVersion(1);
         newModel.setDelFlag(0);
         newModel.setCreateTime(LocalDateTime.now());
+        newModel.setCreateBy(SessionHelper.getLoginUser().getUsername());
         newModel.setUpdateTime(LocalDateTime.now());
         
         save(newModel);
@@ -580,7 +582,7 @@ public class FlowModelServiceImpl extends ServiceImpl<FlowModelMapper, FlowModel
     
     private void validateSequenceFlowRefs(String bpmnXml) {
         java.util.regex.Pattern flowPattern = java.util.regex.Pattern.compile(
-                "<(?:bpmn:)?sequenceFlow\\b([^>]*?)/?>", 
+                "<(?:bpmn:)?sequenceFlow\\b([^>]*?)/?>",
                 java.util.regex.Pattern.CASE_INSENSITIVE);
         java.util.regex.Pattern idPattern = java.util.regex.Pattern.compile("\\bid=\"([^\"]*)\"");
         java.util.regex.Pattern targetRefPattern = java.util.regex.Pattern.compile("\\btargetRef=\"([^\"]*)\"");
@@ -599,7 +601,7 @@ public class FlowModelServiceImpl extends ServiceImpl<FlowModelMapper, FlowModel
             
             if (!hasTargetRef || !hasSourceRef) {
                 String missing = !hasTargetRef ? "targetRef" : "sourceRef";
-                log.error("BPMN sequenceFlow [{}] 缺少 {} 属性，XML 片段: {}", 
+                log.error("BPMN sequenceFlow [{}] 缺少 {} 属性，XML 片段: {}",
                         flowId, missing, flowElement);
                 throw new RuntimeException(String.format(
                         "流程图数据不完整：连线 [%s] 缺少 %s 属性。" +
