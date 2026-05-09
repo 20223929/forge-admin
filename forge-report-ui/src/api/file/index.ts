@@ -19,7 +19,7 @@ export const uploadFileApi = async (file: File, businessType = 'project_screensh
   if (businessId) {
     formData.append('businessId', businessId)
   }
-  return post('/goview-api/api/file/upload', formData, {
+  return post('/forge-report-api/api/file/upload', formData, {
     headers: {
       'Content-Type': 'multipart/form-data'
     }
@@ -27,5 +27,5 @@ export const uploadFileApi = async (file: File, businessType = 'project_screensh
 }
 
 export const getFileUrlApi = (fileId: string, expires = 3600) => {
-  return `/goview-api/api/file/url/${fileId}?expires=${expires}`
+  return `/forge-report-api/api/file/url/${fileId}?expires=${expires}`
 }

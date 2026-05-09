@@ -83,15 +83,15 @@ export const captureProjectScreenshot = async (
     // 如果 accessUrl 存在且有效，直接使用
     if (result.accessUrl) {
       let accessUrl = result.accessUrl
-      if (accessUrl.startsWith('/api/') && !accessUrl.startsWith('/goview-api/')) {
-        accessUrl = '/goview-api' + accessUrl
+      if (accessUrl.startsWith('/api/') && !accessUrl.startsWith('/forge-report-api/')) {
+        accessUrl = '/forge-report-api' + accessUrl
       }
       console.log('[CaptureProject] 截图URL:', accessUrl)
       return accessUrl
     }
     // 本地存储返回 null 时，根据 fileId 构造下载 URL
     if (result.fileId) {
-      const accessUrl = `/goview-api/api/file/download/${result.fileId}`
+      const accessUrl = `/forge-report-api/api/file/download/${result.fileId}`
       console.log('[CaptureProject] 构造截图URL:', accessUrl)
       return accessUrl
     }

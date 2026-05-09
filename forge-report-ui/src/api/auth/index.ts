@@ -29,7 +29,7 @@ export const loginApi = async (data: LoginRequest): Promise<LoginResponse> => {
   // RSA 加密密码
   const encryptedPwd = await encryptPassword(data.password)
 
-  return post('/goview-api/auth/login', {
+  return post('/forge-report-api/auth/login', {
     username: data.username,
     password: encryptedPwd,
     authType: data.authType || 'password',
@@ -44,5 +44,5 @@ export const loginApi = async (data: LoginRequest): Promise<LoginResponse> => {
  * 用户登出
  */
 export const logoutApi = (): Promise<any> => {
-  return post('/goview-api/auth/logout') as Promise<any>
+  return post('/forge-report-api/auth/logout') as Promise<any>
 }

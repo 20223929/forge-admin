@@ -27,7 +27,7 @@ export async function fetchPublicKey(forceRefresh = false): Promise<string> {
     return cachedPublicKey
   }
   try {
-    const res: any = await axiosInstance.get('/goview-api/crypto/public-key')
+    const res: any = await axiosInstance.get('/forge-report-api/crypto/public-key')
     const rawKey = res?.data?.publicKey || res?.publicKey
     if (!rawKey) throw new Error('获取公钥失败')
     // 包装为 PEM 格式

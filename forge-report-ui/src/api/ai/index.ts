@@ -83,7 +83,7 @@ export interface AiGenerateStreamRequest {
 
 /** AI 生成大屏 */
 export const aiGenerate = async (data: AIGenerateRequest) => {
-  const res = await (post('/goview-api/ai/generate', data) as unknown as Promise<ApiResponse<AIGenerateResponse | string>>)
+  const res = await (post('/forge-report-api/ai/generate', data) as unknown as Promise<ApiResponse<AIGenerateResponse | string>>)
   if (typeof res.data === 'string') {
     return JSON.parse(res.data) as AIGenerateResponse
   }
@@ -98,56 +98,56 @@ export const aiGenerateStream = async (
   onError: (error: Error) => void,
   signal?: AbortSignal
 ) => {
-  return consumeAiSse('/goview-api/ai/generate/stream', data, onChunk, onDone, onError, signal, 'AI 生成请求失败')
+  return consumeAiSse('/forge-report-api/ai/generate/stream', data, onChunk, onDone, onError, signal, 'AI 生成请求失败')
 }
 
 // ==================== AI 供应商管理 ====================
 
 /** 获取内置供应商预设模板列表 */
 export const getProviderTemplatesApi = () =>
-  get('/goview-api/ai/provider/templates') as unknown as Promise<ApiResponse<AiProviderTemplate[]>>
+  get('/forge-report-api/ai/provider/templates') as unknown as Promise<ApiResponse<AiProviderTemplate[]>>
 
 /** 分页查询已配置的供应商 */
 export const getProviderPageApi = (params?: { pageNum?: number; pageSize?: number }) =>
-  get('/goview-api/ai/provider/page', params) as unknown as Promise<ApiResponse<{ records: AiProvider[]; total: number }>>
+  get('/forge-report-api/ai/provider/page', params) as unknown as Promise<ApiResponse<{ records: AiProvider[]; total: number }>>
 
 /** 查询供应商详情 */
 export const getProviderDetailApi = (id: number | string) =>
-  get(`/goview-api/ai/provider/${id}`) as unknown as Promise<ApiResponse<AiProvider>>
+  get(`/forge-report-api/ai/provider/${id}`) as unknown as Promise<ApiResponse<AiProvider>>
 
 /** 创建供应商 */
 export const createProviderApi = (data: AiProvider) =>
-  post('/goview-api/ai/provider', data) as unknown as Promise<ApiResponse>
+  post('/forge-report-api/ai/provider', data) as unknown as Promise<ApiResponse>
 
 /** 更新供应商 */
 export const updateProviderApi = (data: AiProvider) =>
-  put('/goview-api/ai/provider', data) as unknown as Promise<ApiResponse>
+  put('/forge-report-api/ai/provider', data) as unknown as Promise<ApiResponse>
 
 /** 删除供应商 */
 export const deleteProviderApi = (id: number | string) =>
-  del(`/goview-api/ai/provider/${id}`) as unknown as Promise<ApiResponse>
+  del(`/forge-report-api/ai/provider/${id}`) as unknown as Promise<ApiResponse>
 
 /** 测试供应商连接（传入 baseUrl + apiKey + defaultModel） */
 export const testProviderApi = (data: Pick<AiProvider, 'providerName' | 'baseUrl' | 'apiKey' | 'defaultModel'>) =>
-  post('/goview-api/ai/provider/test', data) as unknown as Promise<ApiResponse<string>>
+  post('/forge-report-api/ai/provider/test', data) as unknown as Promise<ApiResponse<string>>
 
 /** 设为默认供应商 */
 export const setDefaultProviderApi = (id: number | string) =>
-  put(`/goview-api/ai/provider/${id}/default`) as unknown as Promise<ApiResponse>
+  put(`/forge-report-api/ai/provider/${id}/default`) as unknown as Promise<ApiResponse>
 
 // ==================== AI 会话管理 ====================
 
 /** 获取当前用户历史会话列表 */
 export const getSessionListApi = () =>
-  get('/goview-api/ai/session/list') as unknown as Promise<ApiResponse<AiChatSession[]>>
+  get('/forge-report-api/ai/session/list') as unknown as Promise<ApiResponse<AiChatSession[]>>
 
 /** 获取会话消息记录 */
 export const getSessionMessagesApi = (sessionId: string) =>
-  get(`/goview-api/ai/session/${sessionId}/messages`) as unknown as Promise<ApiResponse<AiChatRecord[]>>
+  get(`/forge-report-api/ai/session/${sessionId}/messages`) as unknown as Promise<ApiResponse<AiChatRecord[]>>
 
 /** 删除会话 */
 export const deleteSessionApi = (sessionId: string) =>
-  del(`/goview-api/ai/session/${sessionId}`) as unknown as Promise<ApiResponse>
+  del(`/forge-report-api/ai/session/${sessionId}`) as unknown as Promise<ApiResponse>
 
 const createNonce = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -271,5 +271,5 @@ export const aiChatStream = async (
   onError: (error: Error) => void,
   signal?: AbortSignal
 ) => {
-  return consumeAiSse('/goview-api/ai/chat/stream', data, onChunk, onDone, onError, signal, 'AI 对话请求失败')
+  return consumeAiSse('/forge-report-api/ai/chat/stream', data, onChunk, onDone, onError, signal, 'AI 对话请求失败')
 }

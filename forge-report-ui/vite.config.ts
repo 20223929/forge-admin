@@ -11,17 +11,17 @@ function pathResolve(dir: string) {
 }
 
 export default defineConfig({
-  base: '/',
+  base: '/forge-report',
   // 修改端口
   server: {
     port: 3021,
     open: true,
     proxy: {
-      // go-view 后端接口（项目管理、AI 供应商、AI Agent、AI 对话）
-      '/goview-api': {
+      // forge-report 后端接口（项目管理、AI 供应商、AI Agent、AI 对话）
+      '/forge-report-api': {
         target: 'http://localhost:8581',
         changeOrigin: true,
-        rewrite: (path: string) => path.replace(/^\/goview-api/, '/')
+        rewrite: (path: string) => path.replace(/^\/forge-report-api/, '/')
       },
       // LLM API 代理（阿里百炼 OpenAI 兼容接口，保留用于前端直调模式）
       '/llm': {
