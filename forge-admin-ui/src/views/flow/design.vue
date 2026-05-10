@@ -69,7 +69,7 @@
             <div class="config-bar-row">
               <div class="config-field">
                 <span class="config-field-label">流程分类</span>
-                <n-tree-select
+                <NTreeSelect
                   v-model:value="modelInfo.category"
                   :options="categoryTreeOptions"
                   placeholder="选择分类"
@@ -137,6 +137,37 @@
                   {{ pageLoading ? '正在加载流程数据...' : '正在渲染流程图...' }}
                 </template>
               </n-spin>
+            </div>
+          </Transition>
+          <Transition name="designer-loading-fade">
+            <div v-if="aiGeneratingCanvasHintVisible" class="ai-generating-mask">
+              <div class="ai-generating-panel">
+                <div class="ai-generating-badge">
+                  <i class="i-material-symbols:auto-awesome ai-generating-icon" />
+                </div>
+                <div class="ai-generating-main">
+                  <div class="ai-generating-title">
+                    AI 正在生成流程图
+                  </div>
+                  <div class="ai-generating-desc">
+                    {{ aiCanvasHintText }}
+                  </div>
+                </div>
+                <div class="ai-generating-stage-list">
+                  <div
+                    v-for="(stage, idx) in aiStages"
+                    :key="stage.key"
+                    class="ai-generating-stage"
+                    :class="{
+                      done: idx < currentAiStageIndex,
+                      active: idx === currentAiStageIndex,
+                    }"
+                  >
+                    <span class="ai-generating-stage-dot" />
+                    <span>{{ stage.label }}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </Transition>
         </div>
@@ -272,7 +303,11 @@
                         </div>
                         <i class="i-material-symbols:expand-more reasoning-toggle" :class="{ expanded: expandedReasonings[index] }" />
                       </div>
-                      <div v-if="expandedReasonings[index]" class="reasoning-content">
+                      <div
+                        v-if="expandedReasonings[index]"
+                        :ref="el => setReasoningContentRef(el, index)"
+                        class="reasoning-content"
+                      >
                         {{ msg.reasoning }}
                       </div>
                     </div>
@@ -521,6 +556,7 @@ const aiCurrentStage = ref('')
 const expandedReasonings = ref({})
 const aiMessageListRef = ref(null)
 const aiMessageEndRef = ref(null)
+const reasoningContentRefs = ref([])
 const showModelPanel = ref(false)
 
 const aiProviderId = ref(null)
@@ -604,6 +640,13 @@ const statusTag = computed(() => {
 const isReadonly = computed(() => modelInfo.status === 1)
 
 const designerLoading = computed(() => pageLoading.value || diagramLoadingCount.value > 0)
+
+const aiGeneratingCanvasHintVisible = computed(() => aiSending.value && !designerLoading.value)
+
+const aiCanvasHintText = computed(() => {
+  const stageText = aiStages.find(s => s.key === aiCurrentStage.value)?.label || '生成流程'
+  return `${stageText}中，请耐心等待，完成后可一键加载到画布`
+})
 
 const currentProviderLabel = computed(() => {
   const item = providerOptions.value.find(p => p.value === aiProviderId.value)
@@ -1020,6 +1063,9 @@ function updateLastAiAssistantMessage(content, reasoningData = null) {
       if (reasoningData.reasoningTime !== undefined && reasoningData.reasoningTime !== null) {
         last.reasoningTime = reasoningData.reasoningTime
       }
+      if (reasoningData.isReasoning) {
+        expandedReasonings.value[aiMessages.value.length - 1] = true
+      }
     }
   }
   else {
@@ -1031,24 +1077,52 @@ function updateLastAiAssistantMessage(content, reasoningData = null) {
       reasoning: reasoningData?.reasoning || '',
       reasoningTime: reasoningData?.reasoningTime || null,
     })
+    if (reasoningData?.isReasoning) {
+      expandedReasonings.value[aiMessages.value.length - 1] = true
+    }
   }
 }
 
 function toggleReasoning(idx) {
   expandedReasonings.value[idx] = !expandedReasonings.value[idx]
+  scrollAiToBottom()
 }
 
 function scrollAiToBottom() {
   nextTick(() => {
     requestAnimationFrame(() => {
+      scrollActiveReasoningToBottom()
       if (aiMessageEndRef.value) {
         aiMessageEndRef.value.scrollIntoView({ block: 'end' })
       }
       if (aiMessageListRef.value) {
         aiMessageListRef.value.scrollTop = aiMessageListRef.value.scrollHeight
       }
+      requestAnimationFrame(() => {
+        scrollActiveReasoningToBottom()
+        if (aiMessageListRef.value) {
+          aiMessageListRef.value.scrollTop = aiMessageListRef.value.scrollHeight
+        }
+      })
     })
   })
+}
+
+function setReasoningContentRef(el, index) {
+  if (el) {
+    reasoningContentRefs.value[index] = el
+  }
+  else {
+    delete reasoningContentRefs.value[index]
+  }
+}
+
+function scrollActiveReasoningToBottom() {
+  const activeIndex = aiMessages.value.findLastIndex(msg => msg.role === 'assistant' && msg.isReasoning)
+  const reasoningEl = reasoningContentRefs.value[activeIndex]
+  if (reasoningEl) {
+    reasoningEl.scrollTop = reasoningEl.scrollHeight
+  }
 }
 
 watch(() => aiMessages.value.length, () => scrollAiToBottom())
@@ -1095,12 +1169,19 @@ async function handleApplyAiDraft() {
       }
     }
 
-    if (!aiDraft.value.bpmnXml.includes('BPMNDiagram') && !aiDraft.value.bpmnXml.includes('bpmndi:BPMNDiagram')) {
-      throw new Error('BPMN XML 缺少图形坐标信息')
+    const safeModelKey = syncSafeModelKey(modelInfo.modelKey || aiDraft.value.modelKey)
+    const xmlToImport = normalizeAiBpmnXml(aiDraft.value.bpmnXml, safeModelKey)
+    const displayIssue = getBpmnDisplayIssue(xmlToImport)
+    if (displayIssue) {
+      throw new Error(displayIssue)
     }
 
-    bpmnXml.value = aiDraft.value.bpmnXml
-    await modelerRef.value?.setXML(aiDraft.value.bpmnXml)
+    aiDraft.value = {
+      ...aiDraft.value,
+      bpmnXml: xmlToImport,
+    }
+    bpmnXml.value = xmlToImport
+    await modelerRef.value?.setXML(xmlToImport)
     hasChanges.value = true
     message.success('AI流程配置已加载到画布')
   }
@@ -1134,14 +1215,20 @@ function handlePreviewAiXml() {
 }
 
 function normalizeAiFlowDraft(draft) {
-  const modelKey = draft.modelKey || modelInfo.modelKey || `process_${Date.now()}`
-  const bpmnXml = ensureProcessId(draft.bpmnXml, modelKey)
+  const modelKey = normalizeBpmnId(draft.modelKey || modelInfo.modelKey || `process_${Date.now()}`)
   return {
     ...draft,
     modelKey,
     modelName: draft.modelName || modelInfo.modelName || 'AI生成流程',
-    bpmnXml: repairBpmnXml(bpmnXml, modelKey),
+    bpmnXml: normalizeAiBpmnXml(draft.bpmnXml, modelKey),
   }
+}
+
+function normalizeAiBpmnXml(xml, modelKey) {
+  const safeModelKey = normalizeBpmnId(modelKey)
+  const extractedXml = extractBpmnXml(xml) || (xml || '').trim()
+  const bpmnXml = ensureProcessId(extractedXml, safeModelKey)
+  return repairBpmnXml(bpmnXml, safeModelKey)
 }
 
 function parseAiFlowResponse(content) {
@@ -1200,23 +1287,75 @@ function extractJsonObject(text) {
 }
 
 function extractBpmnXml(text) {
-  const match = text.match(/<\?xml[\s\S]*<\/(?:bpmn:)?definitions>/)
+  const match = text.match(/(?:<\?xml[\s\S]*?\?>\s*)?<(?:[\w.-]+:)?definitions\b[\s\S]*<\/(?:[\w.-]+:)?definitions>/)
   return match ? match[0].trim() : ''
 }
 
 function ensureProcessId(xml, modelKey) {
-  if (!xml || !modelKey)
+  const safeModelKey = normalizeBpmnId(modelKey)
+  if (!xml || !safeModelKey)
     return xml
-  return xml
-    .replace(/(<bpmn:process\s[^>]*id=")[^"]+(")/, `$1${modelKey}$2`)
-    .replace(/(<bpmndi:BPMNPlane\s[^>]*bpmnElement=")[^"]+(")/, `$1${modelKey}$2`)
+  const doc = parseXmlDocument(xml)
+  if (!doc)
+    return xml
+
+  const processEl = findElementByLocalName(doc, 'process')
+  if (!processEl)
+    return xml
+
+  const originalProcessId = processEl.getAttribute('id')
+  processEl.setAttribute('id', safeModelKey)
+  processEl.setAttribute('isExecutable', 'true')
+
+  findElementsByLocalName(doc, 'participant').forEach((el) => {
+    if (!originalProcessId || el.getAttribute('processRef') === originalProcessId) {
+      el.setAttribute('processRef', safeModelKey)
+    }
+  })
+
+  const hasCollaboration = !!findElementByLocalName(doc, 'collaboration')
+  findElementsByLocalName(doc, 'BPMNPlane').forEach((el) => {
+    if (!hasCollaboration || !originalProcessId || !el.getAttribute('bpmnElement') || el.getAttribute('bpmnElement') === originalProcessId) {
+      el.setAttribute('bpmnElement', safeModelKey)
+    }
+  })
+
+  return new XMLSerializer().serializeToString(doc)
+}
+
+function syncSafeModelKey(modelKey) {
+  const safeModelKey = normalizeBpmnId(modelKey)
+  if (modelInfo.modelKey !== safeModelKey) {
+    const originalModelKey = modelInfo.modelKey || modelKey
+    modelInfo.modelKey = safeModelKey
+    if (originalModelKey && originalModelKey !== safeModelKey) {
+      message.warning(`流程Key已调整为 ${safeModelKey}，BPMN流程ID不能以数字开头或包含特殊字符`)
+    }
+  }
+  return safeModelKey
+}
+
+function normalizeBpmnId(value) {
+  let id = String(value || '').trim()
+  if (!id)
+    id = `process_${Date.now()}`
+
+  id = id
+    .replace(/[^\w.-]/g, '_')
+    .replace(/_+/g, '_')
+
+  if (!/^[a-z_]/i.test(id))
+    id = `process_${id}`
+
+  return id || `process_${Date.now()}`
 }
 
 function repairBpmnXml(xml, modelKey) {
   if (!xml)
     return xml
   const parseError = getXmlParseError(xml)
-  if (!parseError && xml.includes('bpmndi:BPMNDiagram'))
+  const displayIssue = parseError ? '' : getBpmnDisplayIssue(xml)
+  if (!parseError && !displayIssue && hasBpmnDiagram(xml))
     return xml
 
   const repaired = rebuildDiagramInfo(xml, modelKey)
@@ -1224,12 +1363,29 @@ function repairBpmnXml(xml, modelKey) {
     return xml
 
   const repairedError = getXmlParseError(repaired)
+  const repairedDisplayIssue = repairedError ? '' : getBpmnDisplayIssue(repaired)
   if (repairedError) {
     console.warn('[FlowDesign] BPMN XML 修复后仍不可解析:', repairedError)
     return xml
   }
-  console.warn('[FlowDesign] AI 返回的 BPMNDI 坐标信息无效，已重新生成图形信息:', parseError || '缺少 BPMNDiagram')
+  if (repairedDisplayIssue) {
+    console.warn('[FlowDesign] BPMN XML 修复后仍不可展示:', repairedDisplayIssue)
+    return xml
+  }
+  console.warn('[FlowDesign] AI 返回的 BPMNDI 坐标信息无效，已重新生成图形信息:', parseError || displayIssue || '缺少 BPMNDiagram')
   return repaired
+}
+
+function parseXmlDocument(xml) {
+  try {
+    const doc = new DOMParser().parseFromString(xml, 'application/xml')
+    if (doc.querySelector('parsererror'))
+      return null
+    return doc
+  }
+  catch {
+    return null
+  }
 }
 
 function getXmlParseError(xml) {
@@ -1243,6 +1399,36 @@ function getXmlParseError(xml) {
   }
 }
 
+function hasBpmnDiagram(xml) {
+  const doc = parseXmlDocument(xml)
+  if (!doc)
+    return /<(?:[\w.-]+:)?BPMNDiagram\b/.test(xml)
+  return !!findElementByLocalName(doc, 'BPMNDiagram')
+}
+
+function getBpmnDisplayIssue(xml) {
+  const doc = parseXmlDocument(xml)
+  if (!doc)
+    return 'BPMN XML 语法不合法，无法解析'
+
+  const definitionsEl = findElementByLocalName(doc, 'definitions')
+  const rootChildren = definitionsEl ? Array.from(definitionsEl.children) : []
+  const displayRoots = rootChildren.filter(el => ['process', 'collaboration'].includes(el.localName))
+  if (displayRoots.length === 0)
+    return 'BPMN XML 缺少 process 或 collaboration，无法在画布展示'
+
+  const planeEl = findElementByLocalName(doc, 'BPMNPlane')
+  if (!planeEl)
+    return 'BPMN XML 缺少 BPMNPlane 图形平面'
+
+  const rootIds = new Set(displayRoots.map(el => el.getAttribute('id')).filter(Boolean))
+  const planeElement = planeEl.getAttribute('bpmnElement')
+  if (!planeElement || !rootIds.has(planeElement))
+    return 'BPMNPlane 的 bpmnElement 未指向真实的 process/collaboration'
+
+  return ''
+}
+
 function rebuildDiagramInfo(xml, modelKey) {
   const semanticXml = stripDiagramInfo(xml)
   const semanticError = getXmlParseError(semanticXml)
@@ -1252,7 +1438,7 @@ function rebuildDiagramInfo(xml, modelKey) {
   }
 
   const doc = new DOMParser().parseFromString(semanticXml, 'application/xml')
-  const processEl = Array.from(doc.getElementsByTagName('*')).find(el => el.localName === 'process')
+  const processEl = findElementByLocalName(doc, 'process')
   if (!processEl)
     return ''
 
@@ -1286,21 +1472,22 @@ function rebuildDiagramInfo(xml, modelKey) {
   const bounds = layoutBpmnNodes(nodes, flows)
   const diagramXml = buildDiagramXml(processId, nodes, flows, bounds)
   const normalizedSemanticXml = ensureDiagramNamespaces(semanticXml)
-  return normalizedSemanticXml.replace(/<\/(?:bpmn:)?definitions>\s*$/i, `${diagramXml}\n</bpmn:definitions>`)
+  return normalizedSemanticXml.replace(/<\/((?:[\w.-]+:)?definitions)>\s*$/i, `${diagramXml}\n</$1>`)
 }
 
 function stripDiagramInfo(xml) {
-  const start = xml.search(/<bpmndi:BPMNDiagram\b/)
+  const openMatch = xml.match(/<([\w.-]+:)?BPMNDiagram\b/)
+  const start = openMatch?.index ?? -1
   if (start < 0)
     return xml
 
-  const closeTag = '</bpmndi:BPMNDiagram>'
+  const closeTag = `</${openMatch[1] || ''}BPMNDiagram>`
   const end = xml.indexOf(closeTag, start)
   if (end >= 0) {
     return `${xml.slice(0, start)}${xml.slice(end + closeTag.length)}`
   }
 
-  const definitionsEnd = xml.search(/<\/(?:bpmn:)?definitions>\s*$/i)
+  const definitionsEnd = xml.search(/<\/(?:[\w.-]+:)?definitions>\s*$/i)
   if (definitionsEnd >= 0) {
     return `${xml.slice(0, start)}${xml.slice(definitionsEnd)}`
   }
@@ -1316,8 +1503,16 @@ function ensureDiagramNamespaces(xml) {
   return namespaces.reduce((text, [prefix, uri]) => {
     if (text.includes(`xmlns:${prefix}=`))
       return text
-    return text.replace(/<bpmn:definitions\b/, `<bpmn:definitions xmlns:${prefix}="${uri}"`)
+    return text.replace(/<(?:[\w.-]+:)?definitions\b/, match => `${match} xmlns:${prefix}="${uri}"`)
   }, xml)
+}
+
+function findElementByLocalName(doc, localName) {
+  return Array.from(doc.getElementsByTagName('*')).find(el => el.localName === localName) || null
+}
+
+function findElementsByLocalName(doc, localName) {
+  return Array.from(doc.getElementsByTagName('*')).filter(el => el.localName === localName)
 }
 
 function isBpmnFlowNode(localName) {
@@ -1745,6 +1940,134 @@ function getElementTitle(el) {
   justify-content: center;
   background: rgba(248, 250, 252, 0.82);
   backdrop-filter: blur(3px);
+}
+
+.ai-generating-mask {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(248, 250, 252, 0.78);
+  backdrop-filter: blur(2px);
+  pointer-events: auto;
+}
+
+.ai-generating-panel {
+  width: min(420px, 92%);
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.14);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.ai-generating-badge {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eef2ff;
+  color: #4f46e5;
+  box-shadow: inset 0 0 0 1px #c7d2fe;
+}
+
+.ai-generating-icon {
+  font-size: 24px;
+  animation: aiGeneratingPulse 1.4s ease-in-out infinite;
+}
+
+.ai-generating-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ai-generating-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.ai-generating-desc {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #475569;
+}
+
+.ai-generating-stage-list {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.ai-generating-stage {
+  min-width: 0;
+  height: 30px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 6px;
+  font-size: 11px;
+  color: #64748b;
+  background: #f8fafc;
+  white-space: nowrap;
+}
+
+.ai-generating-stage.done {
+  border-color: #bbf7d0;
+  color: #047857;
+  background: #f0fdf4;
+}
+
+.ai-generating-stage.active {
+  border-color: #c7d2fe;
+  color: #4338ca;
+  background: #eef2ff;
+  font-weight: 600;
+}
+
+.ai-generating-stage-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  flex-shrink: 0;
+}
+
+.ai-generating-stage.done .ai-generating-stage-dot {
+  background: #10b981;
+}
+
+.ai-generating-stage.active .ai-generating-stage-dot {
+  background: #6366f1;
+  animation: aiGeneratingPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes aiGeneratingPulse {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
 }
 
 .designer-loading-fade-enter-active,

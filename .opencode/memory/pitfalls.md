@@ -251,3 +251,29 @@ if (processDefinition == null) {
 **影响范围**:
 - `FlowModeler` 撤销/重做状态
 - 所有父子组件通过 `:xml` + `@change` 双向同步 BPMN XML 的场景
+
+## 8. AI 生成 BPMN 的 BPMNPlane 指向错误导致画布导入失败
+
+**发现日期**: 2026-05-10
+
+**问题描述**:
+AI 生成流程配置后点击“加载到画布”，bpmn-js 报错：
+```
+导入 BPMN 失败: Error: no process or collaboration to display
+加载AI流程配置失败: Error: no process or collaboration to display
+```
+
+**根本原因**:
+前端原逻辑只检查 XML 是否包含 `BPMNDiagram`，没有校验 `BPMNPlane` 的 `bpmnElement` 是否指向真实存在的 `process` 或 `collaboration`。AI 返回的 XML 即使有图形坐标，只要平面引用了不存在的流程根元素，bpmn-js 就无法展示。
+
+**解决方案**:
+导入 AI 草稿前必须归一化 BPMN XML：
+- 提取完整 `definitions`，兼容无 XML 声明或非 `bpmn:` 前缀。
+- 用 DOM 同步 `process id`、`participant processRef`、`BPMNPlane bpmnElement`。
+- 校验存在可展示的 `process/collaboration` 和 `BPMNPlane`。
+- 当 BPMNDI 缺失或平面指向错误时，移除旧 BPMNDI 并根据语义节点重建坐标。
+- 模型 Key 不能直接使用纯数字（如 `11212`）作为 BPMN `process id`；导入前应自动规范成 `process_11212` 这类合法 id。
+
+**影响范围**:
+- `forge-admin-ui/src/views/flow/design.vue` 的 AI 流程生成/加载画布。
+- 所有依赖 AI 返回 BPMN XML 并直接导入 bpmn-js 的场景。
