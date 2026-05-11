@@ -1,8 +1,10 @@
 package com.mdframe.forge.plugin.data.support;
 
 import com.mdframe.forge.plugin.data.entity.DataConnection;
+import com.mdframe.forge.starter.crypto.crypto.EncryptorFactory;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -14,7 +16,10 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class JdbcDataSourceProvider {
+
+    private final EncryptorFactory encryptorFactory;
 
     private final Map<Long, HikariDataSource> dataSourceCache = new ConcurrentHashMap<>();
 
@@ -28,7 +33,8 @@ public class JdbcDataSourceProvider {
     }
 
     private HikariDataSource createDataSource(DataConnection connection) {
-        HikariConfig config = buildHikariConfig(connection, connection.getPasswordCipher());
+        String decryptedPassword = decryptPassword(connection.getPasswordCipher());
+        HikariConfig config = buildHikariConfig(connection, decryptedPassword);
         config.setPoolName("data-conn-" + connection.getId());
         return new HikariDataSource(config);
     }
@@ -68,5 +74,17 @@ public class JdbcDataSourceProvider {
             }
         });
         dataSourceCache.clear();
+    }
+
+    private String decryptPassword(String cipherText) {
+        if (cipherText == null || cipherText.isEmpty()) {
+            return cipherText;
+        }
+        try {
+            return encryptorFactory.getDefaultEncryptor().decrypt(cipherText);
+        } catch (Exception e) {
+            log.warn("Failed to decrypt password, using raw value: {}", e.getMessage());
+            return cipherText;
+        }
     }
 }

@@ -14,6 +14,7 @@ import com.mdframe.forge.starter.core.domain.RespInfo;
 import com.mdframe.forge.starter.core.exception.BusinessException;
 import com.mdframe.forge.starter.core.session.SessionHelper;
 import com.mdframe.forge.starter.core.annotation.log.OperationLog;
+import com.mdframe.forge.starter.crypto.crypto.EncryptorFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
@@ -35,6 +36,7 @@ public class DataConnectionController {
     private final DataConnectionService connectionService;
     private final JdbcDataSourceProvider dataSourceProvider;
     private final DbDialectFactory dialectFactory;
+    private final EncryptorFactory encryptorFactory;
 
     @GetMapping("/page")
     public RespInfo<IPage<DataConnection>> page(
@@ -194,7 +196,7 @@ public class DataConnectionController {
         entity.setJdbcUrl(dto.getJdbcUrl());
         entity.setUsername(dto.getUsername());
         if (dto.getPassword() != null && !dto.getPassword().isEmpty()) {
-            entity.setPasswordCipher(dto.getPassword());
+            entity.setPasswordCipher(encryptorFactory.getDefaultEncryptor().encrypt(dto.getPassword()));
         }
         entity.setSchemaName(dto.getSchemaName());
         entity.setTestSql(dto.getTestSql() != null ? dto.getTestSql() : "SELECT 1");
