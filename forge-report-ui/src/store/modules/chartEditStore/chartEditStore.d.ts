@@ -230,6 +230,18 @@ export interface RequestConfigType extends RequestPublicConfigType {
   externalRequestParams?: Record<string, any>
   // 动态请求参数配置
   dynamicRequestParams?: DynamicRequestParamBinding[]
+  // 数据集ID（当 requestDataType 为 DATASET 时）
+  datasetId?: number | null
+  // 数据集名称
+  datasetName?: string
+  // 数据集输出字段
+  datasetFields?: string[]
+  // 数据集查询参数
+  datasetParams?: Record<string, any>
+  // 数据集最大行数
+  datasetMaxRows?: number
+  // 数据集输出模式
+  datasetOutputMode?: string
 }
 
 // Store 类型

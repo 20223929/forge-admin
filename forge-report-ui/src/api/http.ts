@@ -9,6 +9,7 @@ import {
 } from '@/enums/httpEnum'
 import type { RequestGlobalConfigType, RequestConfigType } from '@/store/modules/chartEditStore/chartEditStore.d'
 import { DynamicParamComponent, resolveDynamicRequestParams } from '@/utils/requestDynamicParams'
+import { queryDataDataset } from './data/dataset'
 
 export const get = (url: string, params?: object) => {
   return axiosInstance({
@@ -145,6 +146,11 @@ export const customizeHttp = async (
 
   // 静态数据不发起请求
   if (targetParams.requestDataType === RequestDataTypeEnum.STATIC) return
+  
+  // 数据集模式
+  if (targetParams.requestDataType === RequestDataTypeEnum.DATASET) {
+    return datasetRequest(targetParams, componentList)
+  }
   
   // 外部接口：通过代理转发
   if (requestSource === 'external' && targetParams.externalApiId) {
@@ -312,5 +318,43 @@ const externalProxyRequest = async (
   } catch (error) {
     console.log(error)
     window['$message'].error('外部接口请求失败')
+  }
+}
+
+/**
+ * * 数据集查询请求
+ * @param targetParams 当前组件参数
+ * @param componentList 组件列表
+ */
+const datasetRequest = async (
+  targetParams: RequestConfigType,
+  componentList: DynamicParamComponent[] = []
+) => {
+  const { datasetId, datasetFields, datasetMaxRows, datasetOutputMode } = targetParams
+  
+  if (!datasetId) {
+    window['$message'].error('未选择数据集')
+    return
+  }
+
+  try {
+    const dynamicParams = await resolveDynamicRequestParams(targetParams.dynamicRequestParams, componentList)
+    const datasetParams = mergeDefinedObjects(
+      toPlainObject(dynamicParams.Params),
+      toPlainObject(dynamicParams.Body)
+    )
+    
+    const result = await queryDataDataset({
+      datasetId,
+      params: datasetParams,
+      fields: datasetFields,
+      maxRows: datasetMaxRows,
+      outputMode: datasetOutputMode || 'ECHARTS_DATASET'
+    })
+    
+    return result
+  } catch (error) {
+    console.log(error)
+    window['$message'].error('数据集查询失败')
   }
 }

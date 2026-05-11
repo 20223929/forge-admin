@@ -220,36 +220,7 @@ source ~/.nvm/nvm.sh && nvm use v20.19.0 && cd forge-admin-ui && pnpm build
 
 **目标**: 新增报表组件「数据库数据集」数据加载模式。
 
-**范围**:
-- API 封装：
-  - `forge-report-ui/src/api/data/dataset.ts`
-    - 运行时查询接口
-    - 元数据接口
-- 类型扩展：
-  - `forge-report-ui/src/store/modules/chartEditStore/chartEditStore.d.ts`
-    - 新增 `DatasetRequestConfig`
-    - 扩展 `RequestConfigType`
-- 组件：
-  - 数据配置面板新增「数据库数据集」选项
-  - 数据集选择器（数据连接 → 数据集 → 字段）
-  - 参数绑定（复用现有动态参数弹窗）
-- 请求执行：
-  - `forge-report-ui/src/api/http.ts`
-    - 新增 dataset 模式分支
-    - 解析动态参数
-    - 调用 `/forge-report-api/data/dataset/runtime/query`
-    - 转换响应写入 `option.dataset`
-
-**验证**:
-```bash
-source ~/.nvm/nvm.sh && nvm use v20.19.0 && cd forge-report-ui && pnpm build
-```
-
-**产出**:
-- 报表数据集模式完整实现
-- 动态参数绑定能力
-
-**状态**: pending
+**状态**: completed
 
 ---
 
