@@ -218,6 +218,13 @@ onMounted(() => {
     .edit-content-chart {
       position: absolute;
       overflow: hidden;
+      box-sizing: border-box;
+
+      :deep(*),
+      :deep(*::before),
+      :deep(*::after) {
+        box-sizing: border-box;
+      }
     }
   }
 }

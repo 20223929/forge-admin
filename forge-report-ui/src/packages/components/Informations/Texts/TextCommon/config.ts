@@ -23,16 +23,28 @@ export const FontWeightObject = {
   [FontWeightEnum.BOLD]: 'bold',
 }
 
+export enum FontStyleEnum {
+  NORMAL = '常规',
+  ITALIC = '斜体',
+}
+
+export const FontStyleObject = {
+  [FontStyleEnum.NORMAL]: 'normal',
+  [FontStyleEnum.ITALIC]: 'italic',
+}
+
 export const option = {
   link: '',
   linkHead: 'http://',
   dataset: '我是文本',
   fontSize: 20,
   fontColor: '#ffffff',
+  fontFamily: '',
   paddingX: 10,
   paddingY: 10,
   textAlign: 'center', // 水平对齐方式
   fontWeight: 'normal',
+  fontStyle: 'normal',
 
   // 边框
   borderWidth: 0,

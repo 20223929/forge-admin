@@ -9,6 +9,12 @@
       <span class="title-kicker">WORKSPACE</span>
       <div class="title-line">
         <strong class="title">{{ comTitle }}</strong>
+        <span class="save-status" v-if="saveStatus !== 'idle'">
+          <span v-if="saveStatus === 'saving'" class="save-dot saving"></span>
+          <span v-else-if="saveStatus === 'saved'" class="save-dot saved"></span>
+          <span v-else class="save-dot error"></span>
+          <span class="save-label">{{ saveStatus === 'saving' ? '保存中...' : saveStatus === 'saved' ? '已保存 ' + lastSaveTime : '保存失败' }}</span>
+        </span>
         <span class="edit-cue">
           <n-icon size="12">
             <create-icon></create-icon>
@@ -34,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, computed, watch } from 'vue'
+import { ref, nextTick, computed, watch, inject } from 'vue'
 import { setTitle } from '@/utils'
 import { useChartEditStore } from '@/store/modules/chartEditStore/chartEditStore'
 import { EditCanvasConfigEnum } from '@/store/modules/chartEditStore/chartEditStore.d'
@@ -42,6 +48,14 @@ import { icon } from '@/plugins'
 
 const { ConstructIcon, CreateIcon } = icon.ionicons5
 const chartEditStore = useChartEditStore()
+
+const autoSave = inject<{ saveStatus: any; lastSaveTime: any; saveError: any }>('autoSave', {
+  saveStatus: ref('idle'),
+  lastSaveTime: ref(''),
+  saveError: ref('')
+})
+const saveStatus = computed(() => autoSave.saveStatus.value)
+const lastSaveTime = computed(() => autoSave.lastSaveTime.value)
 
 const focus = ref<boolean>(false)
 const inputInstRef = ref(null)
@@ -126,12 +140,53 @@ const handleBlur = () => {
     @include fetch-color(4);
   }
 
-.title {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--app-theme, $--color-primary);
-  text-shadow: 0 0 8px rgba(var(--app-theme-rgb), 0.32);
-}
+  .title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--app-theme, $--color-primary);
+    text-shadow: 0 0 8px rgba(var(--app-theme-rgb), 0.32);
+  }
+
+  .save-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 16px;
+    padding: 0 6px;
+    border-radius: 999px;
+    font-size: 10px;
+    white-space: nowrap;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .save-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+  }
+
+  .save-dot.saving {
+    background: #fbbf24;
+    animation: save-pulse 1s ease-in-out infinite;
+  }
+
+  .save-dot.saved {
+    background: #34d399;
+  }
+
+  .save-dot.error {
+    background: #f87171;
+  }
+
+  .save-label {
+    color: rgba(226, 232, 240, 0.6);
+  }
+
+  @keyframes save-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
 
   .title-line {
     display: flex;

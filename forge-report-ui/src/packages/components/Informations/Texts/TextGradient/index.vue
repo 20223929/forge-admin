@@ -1,5 +1,5 @@
 <template>
-  <div class="go-text-box">
+  <div class="go-text-box" :style="{ fontFamily: fontFamily || undefined }">
     <n-gradient-text :size="size" :gradient="gradient">
       {{ option.dataset }}
     </n-gradient-text>
@@ -24,7 +24,7 @@ const option = shallowReactive({
 })
 
 const { w, h } = toRefs(props.chartConfig.attr)
-const { size, gradient } = toRefs(props.chartConfig.option)
+const { size, gradient, fontFamily, fontWeight, fontStyle } = toRefs(props.chartConfig.option)
 
 watch(
   () => props.chartConfig.option.dataset,
@@ -47,6 +47,8 @@ useChartDataFetch(props.chartConfig, useChartEditStore, (newData: any) => {
   display: flex;
   align-items: center;
   justify-content: center;
+  font-weight: v-bind('fontWeight');
+  font-style: v-bind('fontStyle');
   .n-gradient-text {
     white-space: initial;
   }

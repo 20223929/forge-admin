@@ -65,5 +65,12 @@ const props = defineProps({
 <style lang="scss" scoped>
 .chart-item {
   position: absolute;
+  box-sizing: border-box;
+
+  :deep(*),
+  :deep(*::before),
+  :deep(*::after) {
+    box-sizing: border-box;
+  }
 }
 </style>

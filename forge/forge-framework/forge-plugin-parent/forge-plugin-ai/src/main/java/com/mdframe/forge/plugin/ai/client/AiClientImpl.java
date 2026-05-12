@@ -154,7 +154,7 @@ public class AiClientImpl implements AiClient {
                     .user(request.getMessage())
                     .stream()
                     .chatResponse()
-                    .flatMap(chatResponse -> {
+                    .concatMap(chatResponse -> {
                         log.info("AI返回:{}", JSONObject.toJSONString(chatResponse));
                         if (chatResponse == null || chatResponse.getResults().isEmpty()) {
                             return Flux.empty();

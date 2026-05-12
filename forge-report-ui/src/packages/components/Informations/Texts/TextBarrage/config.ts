@@ -14,11 +14,23 @@ export const FontWeightObject = {
   [FontWeightEnum.BOLD]: 'bold',
 }
 
+export enum FontStyleEnum {
+  NORMAL = '常规',
+  ITALIC = '斜体',
+}
+
+export const FontStyleObject = {
+  [FontStyleEnum.NORMAL]: 'normal',
+  [FontStyleEnum.ITALIC]: 'italic',
+}
+
 export const option = {
   dataset: '让数字化看得见',
   fontSize: 32,
   fontColor: '#ffffff',
+  fontFamily: '',
   fontWeight: 'normal',
+  fontStyle: 'normal',
   // 字间距
   letterSpacing: 5,
   //阴影

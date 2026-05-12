@@ -200,18 +200,60 @@
       </div>
     </n-collapse-transition>
 
+    <div v-if="referencedComponents.length" class="selection-context active">
+      <div class="selection-context-main">
+        <span class="selection-context-icon">
+          <n-icon size="14"><LayersIcon /></n-icon>
+        </span>
+        <div class="selection-context-info">
+          <div class="selection-context-title">
+            已引用 {{ referencedComponents.length }} 个选中元素
+          </div>
+          <div class="selection-context-name">
+            {{ referencedComponentSummary }}
+          </div>
+        </div>
+      </div>
+      <n-tooltip placement="top" trigger="hover">
+        <template #trigger>
+          <n-button size="tiny" quaternary circle @click="clearReferencedComponents">
+            <template #icon><n-icon><CloseIcon /></n-icon></template>
+          </n-button>
+        </template>
+        取消引用
+      </n-tooltip>
+    </div>
+
     <div class="input-area">
       <n-input
         v-model:value="inputRef"
         type="textarea"
-        :placeholder="chatModeRef === 'generate' ? '描述你想要的数据大屏...' : '有什么可以帮你？'"
-        :rows="3"
+        :placeholder="inputPlaceholder"
+        :rows="2"
         :disabled="aiStore.getGenerating"
         @keydown.enter.exact.prevent="handleSend"
         @keydown.shift.enter.prevent="inputRef += '\n'"
       />
       <div class="input-footer">
-        <span class="hint-text">Enter 发送，Shift+Enter 换行</span>
+        <div class="input-tools">
+          <n-tooltip placement="top" trigger="hover">
+            <template #trigger>
+              <n-button
+                class="reference-btn"
+                :class="{ active: referencePickMode }"
+                size="small"
+                quaternary
+                circle
+                :disabled="aiStore.getGenerating"
+                @click="toggleReferencePickMode"
+              >
+                <template #icon> <img src="~@/assets/images/Click.png" alt="" style="width: 20px"/></template>
+              </n-button>
+            </template>
+            {{ referencePickMode ? '关闭引用模式' : '开启引用模式' }}
+          </n-tooltip>
+          <span class="hint-text">Enter 发送，Shift+Enter 换行</span>
+        </div>
         <n-button v-if="aiStore.getGenerating" type="error" size="small" @click="handleStop">
           <template #icon><n-icon><CloseIcon /></n-icon></template>
           停止生成
@@ -232,7 +274,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, toRaw, watch } from 'vue'
 import {
   type AiProvider,
   aiChatStream,
@@ -244,10 +286,12 @@ import { applyAIToCanvas } from './aiEngine'
 import { parseStreamedResponse } from './llmClient'
 import { getComponentCatalogText } from './componentRegistry'
 import { icon } from '@/plugins'
+import type { CreateComponentGroupType, CreateComponentType } from '@/packages/index.d'
 import { useAIStore } from '@/store/modules/aiStore/aiStore'
 import { useChartEditStore } from '@/store/modules/chartEditStore/chartEditStore'
 
-const { SparklesIcon, SendIcon, AnalyticsIcon, PersonIcon, SettingsSharpIcon, CloseIcon } = icon.ionicons5
+const { SparklesIcon, SendIcon, AnalyticsIcon, PersonIcon, SettingsSharpIcon, CloseIcon, LayersIcon, Click } = icon.ionicons5
+const { Carbon3DCursorIcon } = icon.carbon
 
 const emit = defineEmits(['applied'])
 
@@ -284,12 +328,43 @@ const GENERATE_PROGRESS_STEPS = [
 ]
 
 const hasStreamingMessage = computed(() => aiStore.getChatMessages.some(message => message.streaming))
+const referencedComponentIds = ref<string[]>([])
+const referencePickMode = ref(false)
+const currentSelectedComponentIds = computed(() => sortSelectedComponentIds(chartEditStore.getTargetChart.selectId))
+const referencedComponents = computed(() =>
+  referencedComponentIds.value
+    .map(id => findComponentById(id, chartEditStore.getComponentList))
+    .filter(Boolean) as Array<CreateComponentType | CreateComponentGroupType>
+)
+const referencedComponentSummary = computed(() => {
+  const names = referencedComponents.value.map(item => getComponentDisplayName(item))
+  if (names.length <= 2) return names.join('、')
+  return `${names.slice(0, 2).join('、')} 等`
+})
+const inputPlaceholder = computed(() => {
+  if (referencedComponents.value.length) return '针对已引用元素提问，比如：帮我优化这个模块的配色和层级...'
+  return chatModeRef.value === 'generate' ? '描述你想要的数据大屏...' : '有什么可以帮你？'
+})
 const expandedReasonings = ref<Record<number, boolean>>({})
 const aiRawContent = ref('')
 const aiReasoningContent = ref('')
 const aiIsReasoningPhase = ref(false)
 const aiReasoningStartTime = ref<number | null>(null)
 const aiReasoningEndTime = ref<number | null>(null)
+
+type AIReferencedComponent = {
+  id: string
+  key?: string
+  title?: string
+  category?: string
+  isGroup?: boolean
+  attr?: Record<string, any>
+  styles?: Record<string, any>
+  status?: Record<string, any>
+  request?: Record<string, any>
+  option?: Record<string, any>
+  children?: AIReferencedComponent[]
+}
 
 function createSessionId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -421,6 +496,105 @@ function renderContent(content: string): string {
 function useQuickPrompt(prompt: string) {
   inputRef.value = prompt
   chatModeRef.value = 'generate'
+}
+
+function clearReferencedComponents() {
+  referencedComponentIds.value = []
+  referencePickMode.value = false
+}
+
+function toggleReferencePickMode() {
+  referencePickMode.value = !referencePickMode.value
+  if (!referencePickMode.value) {
+    clearReferencedComponents()
+  } else if (currentSelectedComponentIds.value.length) {
+    referencedComponentIds.value = [...currentSelectedComponentIds.value]
+  }
+}
+
+watch(currentSelectedComponentIds, (newIds) => {
+  if (!referencePickMode.value) return
+  referencedComponentIds.value = [...newIds]
+})
+
+function toggleReferencedComponents() {
+  if (referencedComponentIds.value.length) {
+    clearReferencedComponents()
+    return
+  }
+
+  if (!currentSelectedComponentIds.value.length) {
+    window['$message']?.warning('请先在右侧画布选中要引用的元素')
+    return
+  }
+
+  referencedComponentIds.value = [...currentSelectedComponentIds.value]
+}
+
+function findComponentById(
+  id: string,
+  list: Array<CreateComponentType | CreateComponentGroupType>
+): CreateComponentType | CreateComponentGroupType | undefined {
+  for (const item of list) {
+    if (item.id === id) return item
+    if (item.isGroup && item.groupList?.length) {
+      const target = findComponentById(id, item.groupList)
+      if (target) return target
+    }
+  }
+  return undefined
+}
+
+function sortSelectedComponentIds(ids: string[]) {
+  if (!ids.length) return []
+  const selectedIdSet = new Set(ids)
+  const sortedIds: string[] = []
+
+  const collect = (list: Array<CreateComponentType | CreateComponentGroupType>) => {
+    list.forEach(item => {
+      if (selectedIdSet.has(item.id)) sortedIds.push(item.id)
+      if (item.isGroup && item.groupList?.length) collect(item.groupList)
+    })
+  }
+
+  collect(chartEditStore.getComponentList)
+  return sortedIds
+}
+
+function getComponentDisplayName(component: CreateComponentType | CreateComponentGroupType) {
+  return component.chartConfig?.title || component.key || component.id || '未命名元素'
+}
+
+function buildReferencedComponent(component: CreateComponentType | CreateComponentGroupType): AIReferencedComponent {
+  const rawComponent = toRaw(component) as CreateComponentType | CreateComponentGroupType
+  const referenced: AIReferencedComponent = {
+    id: rawComponent.id,
+    key: rawComponent.key || rawComponent.chartConfig?.chartKey,
+    title: rawComponent.chartConfig?.title,
+    category: rawComponent.chartConfig?.categoryName || rawComponent.chartConfig?.category,
+    isGroup: rawComponent.isGroup,
+    attr: rawComponent.attr,
+    styles: rawComponent.styles,
+    status: rawComponent.status,
+    request: rawComponent.request,
+    option: rawComponent.option
+  }
+
+  if (rawComponent.isGroup && rawComponent.groupList?.length) {
+    referenced.children = rawComponent.groupList.map(item => buildReferencedComponent(item))
+  }
+
+  return referenced
+}
+
+function buildSelectedComponentInstruction() {
+  if (!referencedComponents.value.length) return ''
+  const titles = referencedComponents.value.map(item => `${getComponentDisplayName(item)}(${item.id})`).join('、')
+  return [
+    '当前用户已经在右侧画布选中并引用了以下元素，请优先围绕这些元素回答：',
+    titles,
+    '如果用户要求调整或优化，请基于 selectedComponents 中的组件配置给出针对性建议；不要忽略当前引用元素。'
+  ].join('\n')
 }
 
 function toggleReasoning(index: number) {
@@ -569,6 +743,20 @@ function buildCanvasContext() {
   try {
     const canvasConfig = chartEditStore.getEditCanvasConfig
     const componentList = chartEditStore.getComponentList || []
+    const referencedComponentContext = referencedComponents.value.map(item => buildReferencedComponent(item))
+
+    const existingLayouts = componentList.map(item => {
+      const component = toRaw(item) as CreateComponentType | CreateComponentGroupType
+      return {
+        key: component.key || component.chartConfig?.chartKey,
+        title: component.chartConfig?.title || '',
+        x: component.attr?.x,
+        y: component.attr?.y,
+        w: component.attr?.w,
+        h: component.attr?.h
+      }
+    })
+
     return JSON.stringify(
       {
         canvas: {
@@ -577,7 +765,10 @@ function buildCanvasContext() {
           height: canvasConfig?.height,
           background: canvasConfig?.background || canvasConfig?.backgroundColor
         },
-        components: componentList
+        selectedComponentIds: referencedComponentIds.value,
+        selectedComponents: referencedComponentContext,
+        selectionInstruction: buildSelectedComponentInstruction(),
+        existingComponentLayouts: existingLayouts
       },
       null,
       2
@@ -631,6 +822,8 @@ async function handleSend() {
     return
   }
 
+  const requestCanvasContext = buildCanvasContext()
+  clearReferencedComponents()
   inputRef.value = ''
   aiStore.setGenerating(true)
   resetStreamingState()
@@ -669,7 +862,7 @@ async function handleSend() {
       canvasHeight: height,
       componentCatalog: getComponentCatalogText(),
       projectName: chartEditStore.getEditCanvasConfig?.projectName,
-      canvasContext: buildCanvasContext(),
+      canvasContext: requestCanvasContext,
       providerId: selectedProviderId.value,
       modelName,
       temperature: temperatureRef.value,
@@ -753,7 +946,7 @@ async function handleSend() {
       agentCode: undefined,
       sessionId: activeSessionId,
       projectName: chartEditStore.getEditCanvasConfig?.projectName,
-      canvasContext: buildCanvasContext(),
+      canvasContext: requestCanvasContext,
       providerId: selectedProviderId.value,
       modelName,
       temperature: temperatureRef.value,
@@ -848,12 +1041,15 @@ $topHeight: 40px;
   min-height: 0;
   width: 100%;
   overflow: hidden;
+  background:
+    radial-gradient(circle at 18% 0, rgba(81, 214, 169, 0.08), transparent 32%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.2), rgba(2, 6, 23, 0.08));
 
   .messages-container {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding: 12px 10px;
+    padding: 10px 10px 8px;
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -873,11 +1069,18 @@ $topHeight: 40px;
       align-items: center;
       justify-content: center;
       height: 100%;
-      padding: 20px;
+      padding: 18px 14px;
       text-align: center;
+      border: 1px solid rgba(81, 214, 169, 0.1);
+      border-radius: 14px;
+      margin: 10px;
+      min-height: 360px;
+      background:
+        linear-gradient(180deg, rgba(81, 214, 169, 0.08), transparent 42%),
+        rgba(15, 23, 42, 0.22);
 
       .empty-title {
-        font-size: 15px;
+        font-size: 16px;
         font-weight: 600;
         @include fetch-theme('color');
         margin-bottom: 6px;
@@ -891,21 +1094,26 @@ $topHeight: 40px;
       }
 
       .quick-prompts {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 7px;
         width: 100%;
 
         .quick-btn {
           text-align: left;
           font-size: 12px;
+          height: 32px;
+          justify-content: flex-start;
+          border-radius: 9px;
+          background: rgba(15, 23, 42, 0.56);
+          border: 1px solid rgba(148, 163, 184, 0.1);
         }
       }
     }
 
     .message-item {
       display: flex;
-      gap: 8px;
+      gap: 7px;
       align-items: flex-start;
 
       &.user {
@@ -913,8 +1121,8 @@ $topHeight: 40px;
       }
 
       .avatar {
-        width: 26px;
-        height: 26px;
+        width: 24px;
+        height: 24px;
         border-radius: 50%;
         display: flex;
         align-items: center;
@@ -937,11 +1145,11 @@ $topHeight: 40px;
         display: flex;
         flex-direction: column;
         gap: 6px;
-        max-width: calc(100% - 40px);
+        max-width: calc(100% - 36px);
 
         .reasoning-section {
           border: 1px solid rgba(81, 214, 169, 0.24);
-          border-radius: 8px;
+          border-radius: 10px;
           overflow: hidden;
           background: rgba(81, 214, 169, 0.08);
 
@@ -950,7 +1158,7 @@ $topHeight: 40px;
             align-items: center;
             justify-content: space-between;
             gap: 8px;
-            padding: 7px 9px;
+            padding: 6px 8px;
             cursor: pointer;
             user-select: none;
             transition: background 0.16s ease;
@@ -1015,23 +1223,27 @@ $topHeight: 40px;
         }
 
         .bubble {
-          padding: 8px 12px;
-          border-radius: 8px;
+          padding: 8px 10px;
+          border-radius: 10px;
           font-size: 13px;
-          line-height: 1.6;
+          line-height: 1.55;
           word-break: break-word;
 
           &.assistant {
-            @include fetch-bg-color('background-color2');
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            background:
+              linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent),
+              rgba(15, 23, 42, 0.56);
+            border: 1px solid rgba(148, 163, 184, 0.12);
             @include fetch-theme('color');
             border-bottom-left-radius: 2px;
+            box-shadow: 0 8px 22px rgba(0, 0, 0, 0.12);
           }
 
           &.user {
-            background: #51d6a9;
-            color: #1a1a2e;
+            background: linear-gradient(135deg, #51d6a9, #38d9ff);
+            color: #082016;
             border-bottom-right-radius: 2px;
+            box-shadow: 0 8px 20px rgba(81, 214, 169, 0.12);
           }
 
           .typing-cursor {
@@ -1066,7 +1278,7 @@ $topHeight: 40px;
 
           .generate-progress-card,
           .generate-result-card {
-            min-width: 240px;
+            min-width: 220px;
           }
 
           .generate-progress-card {
@@ -1083,12 +1295,12 @@ $topHeight: 40px;
 
           .generate-progress-list {
             display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 6px;
+            grid-template-columns: 1fr;
+            gap: 5px;
           }
 
           .generate-progress-step {
-            height: 28px;
+            height: 26px;
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 6px;
             display: flex;
@@ -1140,8 +1352,8 @@ $topHeight: 40px;
           }
 
           .generate-result-icon {
-            width: 34px;
-            height: 34px;
+            width: 32px;
+            height: 32px;
             border-radius: 8px;
             display: flex;
             align-items: center;
@@ -1200,10 +1412,11 @@ $topHeight: 40px;
   .style-row,
   .mode-row,
   .config-grid,
+  .selection-context,
   .provider-tip {
     border-top: 1px solid;
     @include fetch-border-color('hover-border-color');
-    @include fetch-bg-color('background-color2');
+    background: rgba(10, 16, 28, 0.78);
     flex-shrink: 0;
   }
 
@@ -1211,8 +1424,8 @@ $topHeight: 40px;
   .mode-row {
     display: flex;
     align-items: center;
-    padding: 6px 10px;
-    gap: 8px;
+    padding: 7px 10px;
+    gap: 7px;
 
     .style-label {
       font-size: 12px;
@@ -1224,8 +1437,8 @@ $topHeight: 40px;
   .config-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 8px 12px;
-    padding: 8px 10px;
+    gap: 7px 8px;
+    padding: 8px 10px 9px;
 
     .config-item {
       display: flex;
@@ -1258,22 +1471,120 @@ $topHeight: 40px;
     color: #7f8c8d;
   }
 
+  .selection-context {
+    min-height: 38px;
+    padding: 6px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    color: rgba(255, 255, 255, 0.42);
+
+    &.active {
+      background: linear-gradient(90deg, rgba(81, 214, 169, 0.12), rgba(81, 214, 169, 0.04));
+      border-top-color: rgba(81, 214, 169, 0.22);
+      color: rgba(232, 255, 248, 0.88);
+    }
+
+    .selection-context-main {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .selection-context-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      color: #51d6a9;
+      background: rgba(81, 214, 169, 0.12);
+      border: 1px solid rgba(81, 214, 169, 0.26);
+    }
+
+    .selection-context-info {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .selection-context-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #dffcf3;
+      line-height: 1.3;
+    }
+
+    .selection-context-name {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .selection-context-name {
+      color: rgba(232, 255, 248, 0.62);
+    }
+  }
+
   .input-area {
-    padding: 8px 10px 12px;
+    padding: 8px 10px 10px;
     flex-shrink: 0;
-    @include fetch-bg-color('background-color2');
+    background:
+      linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(2, 6, 23, 0.92));
     border-top: 1px solid rgba(var(--app-theme-rgb), 0.1);
+
+    :deep(.n-input) {
+      border-radius: 12px;
+      background: rgba(2, 6, 23, 0.52);
+    }
+
+    :deep(.n-input__textarea-el) {
+      font-size: 13px;
+      line-height: 1.55;
+    }
 
     .input-footer {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-top: 6px;
-      min-height: 28px;
+      margin-top: 7px;
+      min-height: 26px;
+      gap: 8px;
+
+      .input-tools {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+      }
+
+      .reference-btn {
+        flex-shrink: 0;
+        color: #777;
+        width: 28px;
+        height: 28px;
+
+        &.active {
+          color: #51d6a9;
+          background: rgba(81, 214, 169, 0.14);
+        }
+      }
 
       .hint-text {
         font-size: 11px;
         color: #666;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
     }
   }

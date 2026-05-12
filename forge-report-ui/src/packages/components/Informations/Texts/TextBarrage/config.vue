@@ -18,6 +18,13 @@
       <setting-item name="字体粗细">
         <n-select v-model:value="optionData.fontWeight" size="small" :options="fontWeightOptions" />
       </setting-item>
+      <setting-item name="字体样式">
+        <n-select v-model:value="optionData.fontStyle" size="small" :options="fontStyleOptions" />
+      </setting-item>
+
+      <setting-item name="字体">
+        <n-select v-model:value="optionData.fontFamily" size="small" :options="fontFamilyOptions" clearable filterable />
+      </setting-item>
 
       <setting-item name="字间距">
         <n-input-number v-model:value="optionData.letterSpacing" size="small" placeholder="输入字间距"></n-input-number>
@@ -67,7 +74,8 @@
 
 <script setup lang="ts">
 import { PropType } from 'vue'
-import { option, FontWeightEnum, FontWeightObject } from './config'
+import { option, FontWeightEnum, FontWeightObject, FontStyleEnum, FontStyleObject } from './config'
+import { fontFamilyOptions } from '@/settings/fonts'
 import { CollapseItem, SettingItemBox, SettingItem } from '@/components/Pages/ChartItemSetting'
 const props = defineProps({
   optionData: {
@@ -84,6 +92,16 @@ const fontWeightOptions = [
   {
     label: FontWeightEnum.BOLD,
     value: FontWeightObject[FontWeightEnum.BOLD]
+  }
+]
+const fontStyleOptions = [
+  {
+    label: FontStyleEnum.NORMAL,
+    value: FontStyleObject[FontStyleEnum.NORMAL]
+  },
+  {
+    label: FontStyleEnum.ITALIC,
+    value: FontStyleObject[FontStyleEnum.ITALIC]
   }
 ]
 </script>

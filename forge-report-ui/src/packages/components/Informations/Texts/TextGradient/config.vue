@@ -11,6 +11,15 @@
       <setting-item name="字体大小">
         <n-input-number v-model:value="optionData.size" size="small" placeholder="字体大小"></n-input-number>
       </setting-item>
+      <setting-item name="字体">
+        <n-select v-model:value="optionData.fontFamily" size="small" :options="fontFamilyOptions" clearable filterable />
+      </setting-item>
+      <setting-item name="字体粗细">
+        <n-select v-model:value="optionData.fontWeight" size="small" :options="fontWeightOptions" />
+      </setting-item>
+      <setting-item name="字体样式">
+        <n-select v-model:value="optionData.fontStyle" size="small" :options="fontStyleOptions" />
+      </setting-item>
     </setting-item-box>
     <setting-item-box name="渐变色参数">
       <setting-item name="起始值">
@@ -30,6 +39,7 @@
 <script setup lang="ts">
 import { PropType } from 'vue'
 import { option } from './config'
+import { fontFamilyOptions } from '@/settings/fonts'
 import {
   CollapseItem,
   SettingItemBox,
@@ -42,4 +52,14 @@ const props = defineProps({
     required: true
   }
 })
+
+const fontWeightOptions = [
+  { label: '常规', value: 'normal' },
+  { label: '加粗', value: 'bold' }
+]
+
+const fontStyleOptions = [
+  { label: '常规', value: 'normal' },
+  { label: '斜体', value: 'italic' }
+]
 </script>

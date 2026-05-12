@@ -94,6 +94,16 @@ const sendHandle = async () => {
 
     await updateProjectApi(projectPayload)
 
+    // 同步写入 sessionStorage，确保预览页优先读到最新数据
+    const sessionStorageInfo = getSessionStorage(StorageEnum.GO_CHART_STORAGE_LIST) || []
+    const idx = sessionStorageInfo.findIndex((e: { id: string }) => e.id === previewId)
+    if (idx !== -1) {
+      sessionStorageInfo.splice(idx, 1, { id: previewId, ...storageInfo })
+    } else {
+      sessionStorageInfo.push({ id: previewId, ...storageInfo })
+    }
+    setSessionStorage(StorageEnum.GO_CHART_STORAGE_LIST, sessionStorageInfo)
+
     const previewPath = fetchPathByName(PreviewEnum.CHART_PREVIEW_NAME, 'href')
     if (!previewPath) {
       window['$message'].error('获取预览路径失败')

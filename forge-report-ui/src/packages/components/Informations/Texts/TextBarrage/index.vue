@@ -25,7 +25,7 @@ const props = defineProps({
 
 const { w } = toRefs(props.chartConfig.attr)
 
-const { fontColor, fontSize, letterSpacing, fontWeight, animationTime, animationSpeed, boxShadow } = toRefs(
+const { fontColor, fontFamily, fontSize, letterSpacing, fontWeight, fontStyle, animationTime, animationSpeed, boxShadow } = toRefs(
   props.chartConfig.option
 )
 
@@ -84,6 +84,8 @@ useChartDataFetch(props.chartConfig, useChartEditStore, (newData: string) => {
     font-size: v-bind('fontSize + "px"');
     letter-spacing: v-bind('letterSpacing + "px"');
     font-weight: v-bind('fontWeight');
+    font-style: v-bind('fontStyle');
+    font-family: v-bind('fontFamily');
     text-shadow: v-bind('boxShadow');
     position: absolute;
     animation: barrage v-bind('transitionDuration + "s"') linear v-bind('animationTime + "s"') infinite;

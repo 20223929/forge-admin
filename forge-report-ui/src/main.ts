@@ -13,6 +13,8 @@ import wiIcons from '@iconify/json/json/wi.json'
 
 // 引入全局样式
 import '@/styles/pages/index.scss'
+// 引入字体
+import '@/assets/font/fonts.css'
 // 引入动画
 import 'animate.css/animate.min.css'
 // 引入标尺

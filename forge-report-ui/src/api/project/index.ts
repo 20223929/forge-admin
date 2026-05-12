@@ -48,7 +48,8 @@ export const publishProjectApi = (id: string | number, publishUrl: string) => {
   return post(`/forge-report-api/goview/project/publish/${id}?publishUrl=${encodeURIComponent(publishUrl)}`) as unknown as Promise<{ code: number; data?: any; msg: string }>
 }
 
-export const buildProjectPayload = (id: string | number, storageInfo: ChartEditStorage, indexImg?: string) => {
+export const buildProjectPayload = (rawId: string | string[] | number, storageInfo: ChartEditStorage, indexImg?: string) => {
+  const id = Array.isArray(rawId) ? rawId[0] : rawId
   const payload: Partial<ForgeProject> = {
     id,
     projectName: storageInfo.editCanvasConfig?.projectName || '新项目',

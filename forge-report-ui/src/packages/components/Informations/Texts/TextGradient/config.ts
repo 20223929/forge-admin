@@ -6,6 +6,9 @@ import cloneDeep from 'lodash/cloneDeep'
 export const option = {
   dataset: '我是渐变文本',
   size: 20,
+  fontFamily: '',
+  fontWeight: 'normal',
+  fontStyle: 'normal',
   gradient: {
     from: '#0000FFFF',
     to: '#00FF00FF',

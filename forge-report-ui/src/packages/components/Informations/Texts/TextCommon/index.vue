@@ -25,6 +25,7 @@ const {
   linkHead,
   link,
   fontColor,
+  fontFamily,
   fontSize,
   letterSpacing,
   paddingY,
@@ -35,7 +36,8 @@ const {
   borderRadius,
   writingMode,
   backgroundColor,
-  fontWeight
+  fontWeight,
+  fontStyle
 } = toRefs(props.chartConfig.option)
 
 const option = shallowReactive({
@@ -79,6 +81,8 @@ const click = () => {
     letter-spacing: v-bind('letterSpacing + "px"');
     writing-mode: v-bind('writingMode');
     font-weight: v-bind('fontWeight');
+    font-style: v-bind('fontStyle');
+    font-family: v-bind('fontFamily');
     border-style: solid;
     border-width: v-bind('borderWidth + "px"');
     border-radius: v-bind('borderRadius + "px"');

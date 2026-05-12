@@ -41,10 +41,11 @@
 </template>
 
 <script setup lang="ts">
-import { toRefs } from 'vue'
+import { toRefs, provide } from 'vue'
 import { loadAsyncComponent } from '@/utils'
 import { LayoutHeaderPro } from '@/layout/components/LayoutHeaderPro'
 import { useContextMenu } from './hooks/useContextMenu.hook'
+import { useAutoSave } from './hooks/useAutoSave.hook'
 import { useChartEditStore } from '@/store/modules/chartEditStore/chartEditStore'
 import { useChartHistoryStore } from '@/store/modules/chartHistoryStore/chartHistoryStore'
 import { useChartLayoutStore } from '@/store/modules/chartLayoutStore/chartLayoutStore'
@@ -52,6 +53,10 @@ import { useChartLayoutStore } from '@/store/modules/chartLayoutStore/chartLayou
 const chartHistoryStoreStore = useChartHistoryStore()
 const chartEditStore = useChartEditStore()
 const { getCharts, getLayers } = toRefs(useChartLayoutStore())
+
+// 实时自动保存
+const { saveStatus, lastSaveTime, saveError } = useAutoSave()
+provide('autoSave', { saveStatus, lastSaveTime, saveError })
 
 // 记录初始化
 chartHistoryStoreStore.canvasInit(chartEditStore.getEditCanvas)

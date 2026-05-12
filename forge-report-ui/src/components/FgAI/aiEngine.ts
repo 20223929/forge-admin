@@ -3,7 +3,7 @@ import { createComponent, fetchChartComponent, fetchConfigComponent } from '@/pa
 import { ConfigType, CreateComponentType, ChartFrameEnum } from '@/packages/index.d'
 import { componentInstall, loadingStart, loadingFinish, loadingError } from '@/utils'
 import { findConfigTypeByKey } from './componentRegistry'
-import { autoLayout } from './layoutAlgorithm'
+import { autoLayout, normalizeAILayout } from './layoutAlgorithm'
 import { AIGenerateResponse, AIComponentSchema } from '@/api/ai/ai.d'
 import merge from 'lodash/merge'
 import cloneDeep from 'lodash/cloneDeep'
@@ -40,9 +40,37 @@ function adjustSeriesForDataset(option: any, dataset: any) {
  */
 function applyOption(instance: CreateComponentType, comp: AIComponentSchema, configType: ConfigType) {
   const aiOption = comp.option
-  if (!aiOption) return
-
   const chartFrame = configType.chartFrame
+
+  if (comp.key.startsWith('ScreenTitle')) {
+    instance.option.dataset = aiOption?.dataset || comp.title || instance.option.dataset
+  }
+  if ((comp.key === 'KpiCard' || comp.key.startsWith('PanelFrame')) && comp.title && !aiOption?.title) {
+    instance.option.title = comp.title
+  }
+
+  if (comp.key === 'TextGradient' && aiOption) {
+    const fontSize = Number(aiOption.fontSize)
+    const size = Number(aiOption.size)
+    if (Number.isFinite(fontSize) && (!Number.isFinite(size) || size < 30)) {
+      aiOption.size = fontSize
+    }
+  }
+
+  if (chartFrame === ChartFrameEnum.STATIC) {
+    if (aiOption) {
+      Object.keys(aiOption).forEach(key => {
+        instance.option[key] = aiOption[key]
+      })
+    } else {
+      if (instance.option?.dataset) {
+        instance.option.dataset = ''
+      }
+    }
+    return
+  }
+
+  if (!aiOption) return
 
   if (chartFrame === ChartFrameEnum.ECHARTS) {
     // ECharts 组件：覆盖 dataset，自动调整 series 数量匹配新数据
@@ -174,6 +202,7 @@ export async function applyAIToCanvas(
     if (needsLayout) {
       components = autoLayout(components, canvasW, canvasH)
     }
+    components = normalizeAILayout(components, canvasW, canvasH)
 
     // 逐个创建组件并添加到画布
     let successCount = 0

@@ -1,8 +1,8 @@
 <template>
   <div
     class="go-chart-edit-tools"
-    :class="[settingStore.getChartToolsStatus, isMiniComputed ? 'isMini' : 'unMini']"
-    @click="isMini && (isMini = false)"
+    :class="[settingStore.getChartToolsStatus, toolsCollapsed ? 'isMini' : 'unMini', { pinned: isPinnedOpen }]"
+    @click="toolsCollapsed && openAsideTools"
     @mouseenter="toolsMouseoverHandle"
     @mouseleave="toolsMouseoutHandle"
   >
@@ -15,6 +15,19 @@
       <PawIcon></PawIcon>
     </n-icon>
 
+    <n-tooltip v-if="isAside" trigger="hover" placement="left">
+      <template #trigger>
+        <n-button class="aside-toggle" quaternary circle size="tiny" @click.stop="toggleAsidePinned">
+          <template #icon>
+            <n-icon size="14">
+              <component :is="toolsCollapsed ? ChevronBackOutlineIcon : ChevronForwardIcon"></component>
+            </n-icon>
+          </template>
+        </n-button>
+      </template>
+      {{ toolsCollapsed ? '展开工具栏' : '收起工具栏' }}
+    </n-tooltip>
+
     <n-tooltip
       v-for="(item, index) in btnListComputed"
       :key="item.key"
@@ -26,7 +39,7 @@
         <div class="btn-item">
           <n-button v-if="item.type === TypeEnum.BUTTON" :circle="isAside" secondary @click="item.handle">
             <template #icon>
-              <n-icon size="22" v-if="isAside">
+              <n-icon size="18" v-if="isAside">
                 <component :is="item.icon"></component>
               </n-icon>
               <component v-else :is="item.icon"></component>
@@ -43,7 +56,7 @@
           >
             <n-button :circle="isAside" secondary>
               <template #icon>
-                <n-icon size="22" v-if="isAside">
+                <n-icon size="18" v-if="isAside">
                   <component :is="item.icon"></component>
                 </n-icon>
                 <component v-else :is="item.icon"></component>
@@ -84,7 +97,15 @@ import { useSyncUpdate } from './hooks/useSyncUpdate.hook'
 import { BtnListType, TypeEnum } from './index.d'
 import { icon } from '@/plugins'
 
-const { DownloadIcon, ShareIcon, PawIcon, SettingsSharpIcon, CreateIcon } = icon.ionicons5
+const {
+  DownloadIcon,
+  ShareIcon,
+  PawIcon,
+  SettingsSharpIcon,
+  CreateIcon,
+  ChevronBackOutlineIcon,
+  ChevronForwardIcon
+} = icon.ionicons5
 const settingStore = useSettingStore()
 const chartEditStore = useChartEditStore()
 const routerParamsInfo = useRoute()
@@ -97,6 +118,7 @@ let mouseTime: any = null
 const globalSettingModel = ref(false)
 // 最小化
 const isMini = ref<boolean>(true)
+const isPinnedOpen = ref<boolean>(false)
 // 控制 tootip 提示时机
 const asideTootipDis = ref(true)
 // 文件上传
@@ -110,6 +132,10 @@ const isHide = computed(() => settingStore.getChartToolsStatusHide)
 
 // 是否展示最小化（与全局配置相关）
 const isMiniComputed = computed(() => isMini.value && isHide.value)
+const toolsCollapsed = computed(() => {
+  if (isAside.value) return isMini.value
+  return isMiniComputed.value
+})
 
 // 页面渲染配置
 const btnListComputed = computed(() => {
@@ -123,6 +149,7 @@ const btnListComputed = computed(() => {
 
 // 鼠标移入
 const toolsMouseoverHandle = () => {
+  if (isPinnedOpen.value) return
   mouseTime = setTimeout(() => {
     if (isMini.value) {
       isMini.value = false
@@ -137,9 +164,28 @@ const toolsMouseoverHandle = () => {
 // 鼠标移出
 const toolsMouseoutHandle = () => {
   clearTimeout(mouseTime)
+  if (isPinnedOpen.value) return
   if (!isMini.value) {
     isMini.value = true
   }
+}
+
+const openAsideTools = () => {
+  if (!isAside.value) return
+  isMini.value = false
+}
+
+const toggleAsidePinned = () => {
+  if (!isAside.value) return
+  if (isMini.value) {
+    isMini.value = false
+    isPinnedOpen.value = true
+    asideTootipDis.value = false
+    return
+  }
+  isMini.value = true
+  isPinnedOpen.value = false
+  asideTootipDis.value = true
 }
 
 // 编辑处理
@@ -217,8 +263,8 @@ $dockBottom: 60px;
 $dockMiniWidth: 200px;
 $dockMiniBottom: 53px;
 
-$asideHeight: 130px;
-$asideMiniHeight: 22px;
+$asideHeight: 118px;
+$asideMiniHeight: 30px;
 $asideBottom: 70px;
 
 @include go('chart-edit-tools') {
@@ -252,25 +298,41 @@ $asideBottom: 70px;
   &.aside {
     display: flex;
     justify-content: center;
-    flex-direction: column-reverse;
+    flex-direction: column;
     height: auto;
     right: 24px;
-    padding: 12px 7px;
+    padding: 8px 6px;
     bottom: $asideBottom;
     overflow: hidden;
     transition: height ease 0.4s;
     border-radius: 16px;
 
+    .aside-toggle {
+      width: 24px;
+      height: 24px;
+      margin-bottom: 10px;
+      color: rgba(226, 232, 240, 0.72);
+      background: rgba(15, 23, 42, 0.62);
+      border: 1px solid rgba(var(--app-theme-rgb), 0.14);
+      flex-shrink: 0;
+
+      &:hover {
+        color: #fff;
+        border-color: rgba(var(--app-theme-rgb), 0.34);
+        background: rgba(var(--app-theme-rgb), 0.14);
+      }
+    }
+
     .btn-item {
-      margin-bottom: 8px;
-      &:first-of-type {
+      margin-bottom: 6px;
+      &:last-of-type {
         margin-bottom: 0;
       }
       @include deep() {
         .n-button {
-          width: 40px;
-          height: 40px;
-          border-radius: 12px;
+          width: 34px;
+          height: 34px;
+          border-radius: 10px;
           padding: 0;
         }
 
@@ -295,7 +357,7 @@ $asideBottom: 70px;
           height: $asideMiniHeight;
         }
         100% {
-          height: 204px;
+          height: 182px;
           opacity: 1;
         }
       }
@@ -309,7 +371,7 @@ $asideBottom: 70px;
           left: -7px;
           top: 8px;
           width: 2px;
-          height: 24px;
+          height: 18px;
           border-radius: 999px;
           background: rgba(var(--app-theme-rgb), 0);
           transition: background 0.2s ease;
@@ -326,7 +388,7 @@ $asideBottom: 70px;
     }
     &.isMini {
       cursor: pointer;
-      padding: 13px 13px;
+      padding: 6px;
       background:
         radial-gradient(circle, rgba(var(--app-theme-rgb), 0.18), rgba(15, 23, 42, 0.78));
       animation: aside-mini-in 0.4s ease forwards;
@@ -346,8 +408,11 @@ $asideBottom: 70px;
         position: relative;
         display: none;
       }
+      .aside-toggle {
+        margin-bottom: 0;
+      }
       .asideLogo {
-        opacity: 1;
+        display: none;
       }
     }
   }
