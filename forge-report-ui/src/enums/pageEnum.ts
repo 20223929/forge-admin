@@ -50,6 +50,10 @@ export enum PageEnum {
   BASE_HOME_AI_PROVIDER = '/project/ai-provider',
   BASE_HOME_AI_PROVIDER_NAME = 'Project-AI-Provider',
 
+  // 素材库
+  BASE_HOME_MATERIALS = '/project/materials',
+  BASE_HOME_MATERIALS_NAME = 'Project-Materials',
+
   // 错误
   ERROR_PAGE_NAME_403 = 'ErrorPage403',
   ERROR_PAGE_NAME_404 = 'ErrorPage404',

@@ -197,39 +197,7 @@
               row-key="id"
               :show-add-button="false"
               :public-params="listParams"
-            >
-              <!-- 自定义操作列 -->
-              <template #table-action="{ row }">
-                <div class="table-action-buttons">
-                  <NButton
-                    v-if="row.mimeType && row.mimeType.startsWith('image/')"
-                    size="small"
-                    type="info"
-                    ghost
-                    @click="handlePreview(row)"
-                  >
-                    <i class="i-material-symbols:visibility" />
-                  </NButton>
-                  <NButton
-                    size="small"
-                    type="primary"
-                    ghost
-                    @click="handleDownload(row)"
-                  >
-                    <i class="i-material-symbols:download" />
-                  </NButton>
-                  <NDropdown
-                    trigger="click"
-                    :options="getDropdownOptions(row)"
-                    @select="(key) => handleDropdownSelect(key, row)"
-                  >
-                    <NButton size="small" type="tertiary" circle>
-                      <i class="i-material-symbols:more-vert" />
-                    </NButton>
-                  </NDropdown>
-                </div>
-              </template>
-            </AiCrudPage>
+            />
           </div>
 
           <!-- 网格视图 -->
@@ -244,19 +212,21 @@
               <p class="empty-text">
                 暂无文件
               </p>
-              <n-upload
-                :action="uploadUrl"
-                :headers="uploadHeaders"
-                :data="uploadData"
-                :multiple="true"
-                :show-file-list="false"
-                @finish="handleUploadFinish"
-                @error="handleUploadError"
-              >
-                <NButton type="primary" size="small">
-                  上传文件
-                </NButton>
-              </n-upload>
+              <div class="text-center">
+                <n-upload
+                  :action="uploadUrl"
+                  :headers="uploadHeaders"
+                  :data="uploadData"
+                  :multiple="true"
+                  :show-file-list="false"
+                  @finish="handleUploadFinish"
+                  @error="handleUploadError"
+                >
+                  <NButton type="primary" size="small">
+                    上传文件
+                  </NButton>
+                </n-upload>
+              </div>
             </div>
 
             <div v-else class="file-grid-container">
@@ -274,20 +244,28 @@
                       @click="handlePreview(file)"
                     >
                     <div v-else class="thumbnail-loading" @click="handlePreview(file)">
-                      <i class="i-material-symbols:image thumbnail-loading-icon" />
-                      <span class="thumbnail-loading-text">加载中...</span>
+                      <template v-if="previewLoadingId === file.fileId">
+                        <i class="i-line-md:loading-twotone-loop thumbnail-loading-icon" />
+                        <span class="thumbnail-loading-text">预览加载中...</span>
+                      </template>
+                      <template v-else>
+                        <i class="i-material-symbols:image thumbnail-loading-icon" />
+                        <span class="thumbnail-loading-text">加载中...</span>
+                      </template>
                     </div>
                   </template>
                   <template v-else>
                     <div
                       class="file-icon-container"
-                      @click="handleDownload(file)"
+                      :class="{ 'is-preview-loading': previewLoadingId === file.fileId }"
+                      @click="canPreviewFile(file) ? handlePreview(file) : handleDownload(file)"
                     >
                       <i
-                        :class="getFileIcon(file.extension)"
+                        :class="previewLoadingId === file.fileId ? 'i-line-md:loading-twotone-loop' : getFileIcon(file.extension)"
                         class="file-icon"
                         :style="{ color: getFileIconColor(file.extension) }"
                       />
+                      <span v-if="previewLoadingId === file.fileId" class="file-preview-loading-text">预览加载中...</span>
                     </div>
                   </template>
 
@@ -422,15 +400,30 @@
       </div>
     </NModal>
 
-    <!-- 图片预览弹窗 -->
+    <!-- 重命名弹窗 -->
+    <NModal v-model:show="renameVisible" preset="dialog" title="重命名" positive-text="确定" negative-text="取消" @positive-click="confirmRename">
+      <NInput v-model:value="renameName" placeholder="请输入新文件名" maxlength="255" />
+    </NModal>
+
+    <!-- 文件预览弹窗 -->
     <NModal
       v-model:show="showPreviewModal"
       preset="card"
-      title="图片预览"
-      style="width: 800px"
+      :title="previewTitle"
+      style="width: 900px; max-width: 92vw"
     >
       <div class="preview-content">
-        <NImage :src="previewUrl" style="max-width: 100%;" />
+        <NImage
+          v-if="previewType === 'image'"
+          :src="previewUrl"
+          class="preview-image"
+        />
+        <iframe
+          v-else-if="previewType === 'pdf'"
+          :src="previewUrl"
+          class="preview-pdf"
+          title="PDF预览"
+        />
       </div>
     </NModal>
   </div>
@@ -441,7 +434,7 @@ import { NButton, NDivider, NDropdown, NImage, NInput, NModal, NSelect, NTag } f
 import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { AiCrudPage } from '@/components/ai-form'
 import { useAuthStore } from '@/store'
-import { getFileUrl, request } from '@/utils'
+import { downloadFile, request, resolveFileAccessUrl, resolveRenderableFileUrl } from '@/utils'
 
 defineOptions({ name: 'FileList' })
 
@@ -449,6 +442,10 @@ const crudRef = ref(null)
 const authStore = useAuthStore()
 const showPreviewModal = ref(false)
 const previewUrl = ref('')
+const previewType = ref('')
+const previewTitle = computed(() => previewType.value === 'pdf' ? 'PDF预览' : '图片预览')
+const previewLoadingId = ref('')
+const isPreviewLoading = computed(() => !!previewLoadingId.value)
 const viewMode = ref('list')
 const selectedGroup = ref('all')
 const showGroupModal = ref(false)
@@ -458,6 +455,9 @@ const newGroupType = ref('default')
 const fileList = ref([])
 const selectedMoveGroup = ref(null)
 const currentMoveFile = ref(null)
+const renameVisible = ref(false)
+const renameFile = ref(null)
+const renameName = ref('')
 
 // 文件分组数据
 const fileGroups = ref([])
@@ -501,11 +501,12 @@ const currentGroupTitle = computed(() => {
       return '图片'
     case 'documents':
       return '文档'
-    default:
+    default: {
       // 对于自定义分组，需要比较字符串类型的ID（避免精度丢失）
       const groupIdStr = String(selectedGroup.value)
       const group = fileGroups.value.find(g => String(g.id) === groupIdStr)
       return group ? group.groupName : '文件列表'
+    }
   }
 })
 
@@ -536,7 +537,7 @@ function isValidGroupId(value) {
   if (value === null || value === undefined || value === '')
     return false
   const num = Number(value)
-  return !isNaN(num) && num > 0
+  return !Number.isNaN(num) && num > 0
 }
 
 // 监听弹窗关闭，释放 blob URL
@@ -545,15 +546,12 @@ watch(showPreviewModal, (newVal) => {
     URL.revokeObjectURL(previewUrl.value)
     previewUrl.value = ''
   }
+  if (!newVal)
+    previewType.value = ''
 })
 
 // 监听分组变化，刷新列表
-watch(selectedGroup, (newVal, oldVal) => {
-  console.log('分组变化:', oldVal, '->', newVal, 'listParams:', listParams.value)
-
-  if (newVal === oldVal)
-    return
-
+watch(selectedGroup, () => {
   if (viewMode.value === 'grid') {
     refreshFileGrid()
   }
@@ -783,7 +781,7 @@ const tableColumns = [
     label: '操作',
     width: 220,
     fixed: 'right',
-    _slot: 'action',
+    render: row => renderFileActions(row),
   },
 ]
 
@@ -870,6 +868,63 @@ function getFileIconColor(extension) {
   return fileIconColors[ext] || fileIconColors.default
 }
 
+function isPdfFile(file) {
+  return file?.mimeType === 'application/pdf' || file?.extension?.toLowerCase() === 'pdf'
+}
+
+function canPreviewFile(file) {
+  return !!(file?.mimeType?.startsWith('image/') || isPdfFile(file))
+}
+
+function renderFileActions(row) {
+  const children = []
+  const appendDivider = () => {
+    if (children.length > 0)
+      children.push(h('span', { class: 'table-action-divider' }, ' | '))
+  }
+
+  if (canPreviewFile(row)) {
+    const isLoading = previewLoadingId.value === row.fileId
+    const isDisabled = isPreviewLoading.value && !isLoading
+    children.push(h('a', {
+      class: ['table-action-link', isDisabled ? 'disabled' : ''],
+      onClick: (event) => {
+        event?.stopPropagation()
+        event?.preventDefault()
+        if (!isDisabled)
+          handlePreview(row)
+      },
+    }, isLoading ? '加载中...' : '预览'))
+  }
+
+  appendDivider()
+  children.push(h('a', {
+    class: 'table-action-link',
+    onClick: (event) => {
+      event?.stopPropagation()
+      event?.preventDefault()
+      handleDownload(row)
+    },
+  }, '下载'))
+
+  appendDivider()
+  children.push(h(NDropdown, {
+    trigger: 'click',
+    options: getDropdownOptions(row),
+    onSelect: key => handleDropdownSelect(key, row),
+  }, {
+    default: () => h('a', {
+      class: 'table-action-link',
+      onClick: (event) => {
+        event?.stopPropagation()
+        event?.preventDefault()
+      },
+    }, '更多'),
+  }))
+
+  return h('div', { class: 'table-action-column file-list-action-column' }, children)
+}
+
 // 格式化日期
 function formatDate(dateString) {
   if (!dateString)
@@ -934,7 +989,7 @@ async function refreshFileGrid() {
         extension: item.extension ? `.${item.extension}` : '',
         mimeType: item.mimeType,
         thumbnailUrl: '',
-        accessUrl: getFileUrl(item.fileId),
+        accessUrl: '',
         uploadTime: item.uploadTime,
         storageType: item.storageType,
         businessType: item.businessType,
@@ -986,10 +1041,9 @@ async function fetchStorageConfigs() {
   }
 }
 
-// 异步加载图片缩略图（使用 fetch + blob URL 携带认证信息）
+// 异步加载图片缩略图（使用可缓存的访问地址）
 async function loadImageThumbnails() {
   const version = ++thumbnailLoadVersion
-  const token = authStore.accessToken
 
   // 收集需要加载缩略图的图片文件索引
   const imageIndexes = []
@@ -1014,16 +1068,12 @@ async function loadImageThumbnails() {
         const file = fileList.value[idx]
         if (!file)
           return
-        const url = getFileUrl(file.fileId)
-        const res = await fetch(url, {
-          headers: { Authorization: token ? `Bearer ${token}` : '' },
-        })
-        if (res.ok && thumbnailLoadVersion === version) {
-          const blob = await res.blob()
-          fileList.value[idx].thumbnailUrl = URL.createObjectURL(blob)
+        const url = await resolveRenderableFileUrl(file.fileId)
+        if (url && thumbnailLoadVersion === version) {
+          fileList.value[idx].thumbnailUrl = url
         }
       }
-      catch (e) {
+      catch {
         // 静默处理单个缩略图加载失败
       }
     }))
@@ -1036,6 +1086,7 @@ function cleanupBlobUrls() {
     if (file.thumbnailUrl && file.thumbnailUrl.startsWith('blob:')) {
       URL.revokeObjectURL(file.thumbnailUrl)
     }
+    file.thumbnailUrl = ''
   })
 }
 
@@ -1108,11 +1159,15 @@ function getDropdownOptions(file) {
     {
       label: '预览',
       key: 'preview',
-      disabled: !(file.mimeType && file.mimeType.startsWith('image/')),
+      disabled: !canPreviewFile(file),
     },
     {
       label: '下载',
       key: 'download',
+    },
+    {
+      label: '重命名',
+      key: 'rename',
     },
     {
       label: '复制链接',
@@ -1141,6 +1196,9 @@ function handleDropdownSelect(key, file) {
     case 'download':
       handleDownload(file)
       break
+    case 'rename':
+      openRenameDialog(file)
+      break
     case 'copy':
       handleCopyUrl(file)
       break
@@ -1158,6 +1216,35 @@ function handleMoveFile(file) {
   currentMoveFile.value = file
   selectedMoveGroup.value = null
   showMoveModal.value = true
+}
+
+// 重命名
+function openRenameDialog(file) {
+  renameFile.value = file
+  renameName.value = file.originalName || ''
+  renameVisible.value = true
+}
+
+async function confirmRename() {
+  const file = renameFile.value
+  const newName = renameName.value?.trim()
+  if (!file || !newName || newName === file.originalName) {
+    renameVisible.value = false
+    return
+  }
+  try {
+    const res = await request.put(`/system/file/metadata/rename?fileId=${encodeURIComponent(file.fileId)}&originalName=${encodeURIComponent(newName)}`)
+    if (res?.code === 200) {
+      file.originalName = newName
+      window.$message?.success('重命名成功')
+    } else {
+      window.$message?.error(res?.msg || '重命名失败')
+    }
+  } catch (e) {
+    window.$message?.error('重命名失败')
+  } finally {
+    renameVisible.value = false
+  }
 }
 
 // 确认移动文件
@@ -1218,7 +1305,7 @@ function handleUploadFinish({ file, event }) {
       window.$message.error(response.msg || '上传失败')
     }
   }
-  catch (error) {
+  catch {
     window.$message.error('上传失败')
   }
 }
@@ -1230,99 +1317,66 @@ function handleUploadError({ file }) {
 
 // 预览
 async function handlePreview(row) {
+  if (previewLoadingId.value)
+    return
+
+  previewLoadingId.value = row.fileId
   try {
-    const token = authStore.accessToken
-    const url = getFileUrl(row.fileId)
-
-    // 使用 fetch 获取图片并转换为 blob URL（带 token）
-    const response = await fetch(url, {
-      headers: {
-        Authorization: token ? `Bearer ${token}` : '',
-      },
-    })
-
-    if (!response.ok) {
-      throw new Error('图片加载失败')
-    }
-
-    const blob = await response.blob()
-    const blobUrl = URL.createObjectURL(blob)
-    previewUrl.value = blobUrl
+    const url = await resolveRenderableFileUrl(row.fileId)
+    if (!url)
+      throw new Error('文件加载失败')
+    previewUrl.value = url
+    previewType.value = isPdfFile(row) ? 'pdf' : 'image'
     showPreviewModal.value = true
   }
   catch (error) {
     window.$message.error(`预览失败：${error.message || '未知错误'}`)
   }
+  finally {
+    previewLoadingId.value = ''
+  }
 }
 
 // 下载
 async function handleDownload(row) {
-  const loadingMessage = null
   try {
-    const token = authStore.accessToken
-    const url = getFileUrl(row.fileId)
-
-    // 使用 fetch 下载文件（带 token）
-    // loadingMessage = window.$message.loading('正在下载...', { duration: 0 })
-    const response = await fetch(url, {
-      headers: {
-        Authorization: token ? `Bearer ${token}` : '',
-      },
-    })
-
-    if (!response.ok) {
-      throw new Error('下载失败')
-    }
-
-    const blob = await response.blob()
-    const blobUrl = URL.createObjectURL(blob)
-
-    // 创建下载链接
-    const link = document.createElement('a')
-    link.href = blobUrl
-    link.download = row.originalName
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-
-    // 释放 blob URL
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 100)
-
+    await downloadFile(row.fileId, row.originalName)
     window.$message.success('下载成功')
   }
   catch (error) {
     window.$message.error(`下载失败：${error.message || '未知错误'}`)
-  }
-  finally {
-    if (loadingMessage)
-      loadingMessage.destroy()
   }
 }
 
 // 复制链接
 function handleCopyUrl(row) {
   try {
-    const url = getFileUrl(row.fileId)
-    // 使用现代浏览器的 Clipboard API
-    if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(url).then(() => {
+    resolveFileAccessUrl(row.fileId).then((url) => {
+      if (!url)
+        throw new Error('链接获取失败')
+      // 使用现代浏览器的 Clipboard API
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(url).then(() => {
+          window.$message.success('链接已复制到剪贴板')
+        })
+      }
+      else {
+        // 降级方案
+        const textarea = document.createElement('textarea')
+        textarea.value = url
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textarea)
         window.$message.success('链接已复制到剪贴板')
-      })
-    }
-    else {
-      // 降级方案
-      const textarea = document.createElement('textarea')
-      textarea.value = url
-      textarea.style.position = 'fixed'
-      textarea.style.opacity = '0'
-      document.body.appendChild(textarea)
-      textarea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textarea)
-      window.$message.success('链接已复制到剪贴板')
-    }
+      }
+    }).catch(() => {
+      window.$message.error('链接获取失败')
+    })
   }
-  catch (error) {
+  catch {
     window.$message.error('复制失败')
   }
 }
@@ -1353,7 +1407,7 @@ function handleDelete(row) {
           await fetchFileGroups()
         }
       }
-      catch (error) {
+      catch {
         window.$message.error('删除失败')
       }
     },
@@ -1649,6 +1703,30 @@ function handleDelete(row) {
   overflow: hidden;
 }
 
+/* 修复双滚动条：外层用 overflow: clip 裁剪，n-data-table 用 flex 确保分页器可见 */
+.file-table :deep(.ai-crud-main) {
+  overflow: hidden;
+}
+.file-table :deep(.ai-crud-table) {
+  display: flex !important;
+  flex-direction: column;
+  overflow: hidden;
+}
+.file-table :deep(.n-data-table) {
+  flex: 1;
+  display: flex !important;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.file-table :deep(.n-data-table-wrapper) {
+  flex: 1;
+  min-height: 0;
+}
+.file-table :deep(.n-pagination) {
+  flex-shrink: 0;
+}
+
 :deep(.n-data-table) {
   font-size: 14px;
 }
@@ -1706,14 +1784,39 @@ function handleDelete(row) {
   color: var(--primary-400);
 }
 
-.table-action-buttons {
+.file-list-action-column {
   display: flex;
   align-items: center;
-  gap: 6px;
+  white-space: nowrap;
 }
 
-.table-action-buttons :deep(.n-button) {
-  border-radius: var(--radius-md);
+.file-list-action-column .table-action-link {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--font-size-sm);
+  color: var(--primary-600);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+  text-decoration: none;
+  line-height: 1.5;
+}
+
+.file-list-action-column .table-action-link:hover {
+  background: var(--primary-50);
+  color: var(--primary-700);
+}
+
+.file-list-action-column .table-action-link.disabled {
+  color: var(--text-disabled);
+  cursor: not-allowed;
+  background: transparent;
+}
+
+.file-list-action-column .table-action-divider {
+  color: var(--border-strong);
+  user-select: none;
 }
 
 /* --- 网格视图 --- */
@@ -1781,9 +1884,13 @@ function handleDelete(row) {
 .file-grid-container {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-auto-rows: minmax(238px, auto);
+  align-content: start;
   gap: 16px;
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
+  padding-bottom: 16px;
 }
 
 .file-grid-container::-webkit-scrollbar {
@@ -1800,6 +1907,9 @@ function handleDelete(row) {
   border-radius: var(--radius-card);
   border: 1px solid var(--border-light);
   overflow: hidden;
+  min-height: 238px;
+  display: flex;
+  flex-direction: column;
   transition:
     box-shadow var(--transition-base),
     border-color var(--transition-base);
@@ -1814,6 +1924,7 @@ function handleDelete(row) {
 .file-preview {
   position: relative;
   height: 148px;
+  flex: 0 0 148px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1837,14 +1948,25 @@ function handleDelete(row) {
   width: 100%;
   height: 100%;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   font-size: 48px;
   color: var(--text-disabled);
   transition: color var(--transition-base);
 }
 
 .file-card:hover .file-icon-container {
+  color: var(--text-tertiary);
+}
+
+.file-icon-container.is-preview-loading {
+  color: var(--primary-500);
+}
+
+.file-preview-loading-text {
+  font-size: 12px;
   color: var(--text-tertiary);
 }
 
@@ -1896,33 +2018,48 @@ function handleDelete(row) {
 }
 
 .file-info {
+  flex: 1 0 auto;
+  min-height: 88px;
   padding: 12px;
   border-top: 1px solid var(--border-light);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .file-name {
   font-size: 13px;
   font-weight: var(--font-weight-medium);
   color: var(--text-primary);
-  margin-bottom: 6px;
-  white-space: nowrap;
+  line-height: 1.4;
+  display: -webkit-box;
   overflow: hidden;
-  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  word-break: break-all;
 }
 
 .file-meta {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
   font-size: 12px;
   color: var(--text-tertiary);
+  min-width: 0;
 }
 
 .file-size {
   color: var(--text-tertiary);
+  flex-shrink: 0;
 }
 .file-time {
   color: var(--text-disabled);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* --- 分组管理弹窗 --- */
@@ -2068,10 +2205,24 @@ function handleDelete(row) {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 400px;
+  min-height: 520px;
   background: var(--bg-secondary);
   border-radius: var(--radius-md);
   padding: 16px;
+}
+
+.preview-image {
+  max-width: 100%;
+  max-height: 70vh;
+}
+
+.preview-pdf {
+  width: 100%;
+  height: 70vh;
+  min-height: 520px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: #fff;
 }
 
 /* --- 响应式 --- */
@@ -2102,6 +2253,13 @@ function handleDelete(row) {
   }
   .file-preview {
     height: 110px;
+    flex-basis: 110px;
+  }
+  .file-card {
+    min-height: 214px;
+  }
+  .file-info {
+    min-height: 96px;
   }
 }
 

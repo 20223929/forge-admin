@@ -28,6 +28,14 @@ export function refreshConfig() {
   })
 }
 
+// 获取默认存储配置
+export function getDefaultStorageConfig() {
+  return request({
+    url: '/system/storage/config/default',
+    method: 'get',
+  })
+}
+
 // 以下是针对特定配置类型的便捷方法
 
 // 登录配置

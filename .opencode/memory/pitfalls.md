@@ -203,6 +203,22 @@ public RespInfo<GoviewProject> getById(@PathVariable Long id) {
 - `forge-report-ui` 项目保存、发布、详情回显
 - 所有启用前端加密拦截的后端接口
 
+## 6. 本地文件存储返回相对访问地址导致图片渲染失败
+
+**发现日期**: 2026-05-14
+
+**问题描述**:
+`/api/file/url/{fileId}` 在本地存储场景下可能返回 `/api/file/download/{fileId}` 这种相对路径。
+如果前端直接把这个值塞给 `img src` 或头像组件，浏览器会去当前站点根路径取资源，导致图片不显示或加载失败。
+
+**解决方案**:
+前端统一通过 `resolveFileAccessUrl()` 归一化访问地址，必要时补上 `VITE_REQUEST_PREFIX`。
+图片加载失败时，再调用 `removeCachedFileAccessUrl()` 清理旧缓存后重试。
+
+**影响范围**:
+- 所有使用文件访问地址渲染图片的前端组件
+- 头像、favicon、素材预览、图片上传回显等场景
+
 ---
 
 ## 记录规范

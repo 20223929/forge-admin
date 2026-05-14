@@ -9,7 +9,14 @@
     <div class="project-modal">
       <div class="modal-left">
         <div class="modal-image" @click="doEdit">
-          <img :src="imageSrc" :alt="cardData?.title" />
+          <fg-auth-image
+            :src="cardData?.indexImg"
+            :alt="cardData?.title"
+            :fallback="requireUrl('project/moke-20211219181327.png')"
+            img-class="modal-cover"
+            :img-style="{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }"
+            :lazy="false"
+          ></fg-auth-image>
           <div class="image-hover-panel">
             <n-icon size="28"><HammerIcon /></n-icon>
             <span>点击编辑项目</span>
@@ -76,12 +83,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onUnmounted } from 'vue'
-import { getLocalStorage, fetchPathByName, routerTurnByPath } from '@/utils'
+import { ref, watch } from 'vue'
+import { fetchPathByName, routerTurnByPath } from '@/utils'
 import { icon } from '@/plugins'
-import { StorageEnum } from '@/enums/storageEnum'
 import { PreviewEnum } from '@/enums/pageEnum'
 import { publishProjectApi } from '@/api/project'
+import FgAuthImage from '@/components/FgAuthImage/index.vue'
 
 const { HammerIcon, CloseIcon, BrowsersOutlineIcon, SendIcon } = icon.ionicons5
 const showRef = ref(false)
@@ -95,26 +102,6 @@ const props = defineProps({
 watch(() => props.modalShow, v => { showRef.value = v }, { immediate: true })
 
 const requireUrl = (n: string) => new URL(`../../../../../assets/images/${n}`, import.meta.url).href
-
-const imageSrc = ref('')
-let blobUrl: string | null = null
-
-const needsAuth = (u: string) => !(!u || u.startsWith('data:') || u.startsWith('blob:') || u.startsWith('http://') || u.startsWith('https://')) && u.includes('/api/file/')
-
-const loadImg = async (u: string) => {
-  if (blobUrl) { URL.revokeObjectURL(blobUrl); blobUrl = null }
-  if (!u) { imageSrc.value = requireUrl('project/moke-20211219181327.png'); return }
-  if (!needsAuth(u)) { imageSrc.value = u; return }
-  try {
-    const t = getLocalStorage(StorageEnum.GO_ACCESS_TOKEN_STORE)
-    const r = await fetch(u, { headers: { Authorization: t ? `Bearer ${t}` : '' } })
-    if (r.ok) { const b = await r.blob(); blobUrl = URL.createObjectURL(b); imageSrc.value = blobUrl }
-    else imageSrc.value = requireUrl('project/moke-20211219181327.png')
-  } catch { imageSrc.value = requireUrl('project/moke-20211219181327.png') }
-}
-
-watch(() => props.cardData?.indexImg, v => loadImg(v), { immediate: true })
-onUnmounted(() => { if (blobUrl) URL.revokeObjectURL(blobUrl) })
 
 const closeHandle = () => emit('close')
 

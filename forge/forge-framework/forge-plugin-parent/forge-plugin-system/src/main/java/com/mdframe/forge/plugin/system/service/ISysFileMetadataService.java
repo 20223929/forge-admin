@@ -23,7 +23,17 @@ public interface ISysFileMetadataService extends IService<SysFileMetadata> {
     List<SysFileMetadata> listByBusiness(String businessType, String businessId);
     
     /**
+     * 根据 fileId 字符串查询元数据
+     */
+    SysFileMetadata getByFileId(String fileId);
+
+    /**
      * 批量删除
      */
     void removeBatch(String[] fileIds);
+
+    /**
+     * 重命名文件（仅修改 originalName）
+     */
+    void rename(String fileId, String originalName);
 }

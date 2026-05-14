@@ -44,7 +44,15 @@ public class SysFileMetadataController {
     public RespInfo<SysFileMetadata> detail(@PathVariable Long id) {
         return RespInfo.success(fileMetadataService.getById(id));
     }
-    
+
+    /**
+     * 根据 fileId（字符串）查询元数据
+     */
+    @GetMapping("/byFileId/{fileId}")
+    public RespInfo<SysFileMetadata> getByFileId(@PathVariable String fileId) {
+        return RespInfo.success(fileMetadataService.getByFileId(fileId));
+    }
+
     /**
      * 根据业务类型和业务ID查询
      */
@@ -78,5 +86,14 @@ public class SysFileMetadataController {
     @PutMapping
     public RespInfo<Boolean> update(@RequestBody SysFileMetadata metadata) {
         return RespInfo.success(fileMetadataService.updateById(metadata));
+    }
+
+    /**
+     * 重命名文件
+     */
+    @PutMapping("/rename")
+    public RespInfo<Void> rename(@RequestParam String fileId, @RequestParam String originalName) {
+        fileMetadataService.rename(fileId, originalName);
+        return RespInfo.success();
     }
 }

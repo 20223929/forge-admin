@@ -12,7 +12,7 @@
           </h2>
         </div>
         <div class="header-desc">
-          多存储源配置管理，支持本地/MinIO/阿里云OSS等多种存储方案
+          多存储源配置管理，支持本地/RustFS/腾讯云COS等多种存储方案
         </div>
       </div>
     </div>
@@ -26,7 +26,7 @@
           detail: 'post@/system/storage/config/detail',
           add: 'post@/system/storage/config',
           update: 'put@/system/storage/config',
-          delete: 'delete@/system/storage/config/{ids}',
+          delete: 'delete@/system/storage/config/:ids',
         }"
         :search-schema="searchSchema"
         :columns="tableColumns"
@@ -209,12 +209,13 @@ const tableColumns = computed(() => [
   {
     prop: 'action',
     label: '操作',
-    width: 180,
+    width: 220,
     fixed: 'right',
     actions: [
       { label: '编辑', key: 'edit', onClick: handleEdit },
       { label: '设为默认', key: 'setDefault', onClick: handleSetDefault, visible: row => !row.isDefault },
       { label: '测试连接', key: 'testConnection', onClick: handleTestConnection },
+      { label: '创建桶', key: 'createBucket', onClick: handleCreateBucket, visible: row => row.storageType !== 'local' },
       { label: '禁用', key: 'disable', onClick: handleToggleEnabled, visible: row => row.enabled },
       { label: '启用', key: 'enable', onClick: handleToggleEnabled, visible: row => !row.enabled },
       { label: '删除', key: 'delete', type: 'error', onClick: handleDelete },
@@ -297,7 +298,7 @@ const editSchema = [
         message: '请输入访问端点',
         trigger: 'blur',
         validator: (rule, value, formData) => {
-          if (formData.storageType !== 'local' && !value) {
+          if (isEndpointRequired(formData.storageType) && !value) {
             return new Error('请输入访问端点')
           }
           return true
@@ -305,9 +306,9 @@ const editSchema = [
       },
     ],
     props: {
-      placeholder: '如：http://127.0.0.1:9000 或 https://oss-cn-hangzhou.aliyuncs.com',
+      placeholder: '如：http://127.0.0.1:9000，腾讯云COS无需填写',
     },
-    vIf: formData => formData.storageType !== 'local',
+    vIf: formData => isEndpointRequired(formData.storageType),
   },
   {
     field: 'bucketName',
@@ -327,7 +328,7 @@ const editSchema = [
       },
     ],
     props: {
-      placeholder: '请输入存储桶名称',
+      placeholder: '腾讯云COS请输入完整桶名，如：forge-files-1250000000',
     },
     vIf: formData => formData.storageType !== 'local',
   },
@@ -336,7 +337,7 @@ const editSchema = [
     label: '区域',
     type: 'input',
     props: {
-      placeholder: '如：cn-hangzhou、ap-guangzhou',
+      placeholder: '如：ap-guangzhou',
     },
     vIf: formData => ['aliyun', 'tencent', 's3'].includes(formData.storageType),
   },
@@ -487,6 +488,10 @@ function handleSubmitFileType(submit) {
   }
 }
 
+function isEndpointRequired(storageType) {
+  return storageType && !['local', 'tencent'].includes(storageType)
+}
+
 // 删除
 function handleDelete(row) {
   window.$dialog.warning({
@@ -502,7 +507,7 @@ function handleDelete(row) {
           crudRef.value?.refresh()
         }
       }
-      catch (error) {
+      catch {
         window.$message.error('删除失败')
       }
     },
@@ -524,7 +529,7 @@ function handleSetDefault(row) {
           crudRef.value?.refresh()
         }
       }
-      catch (error) {
+      catch {
         window.$message.error('设置失败')
       }
     },
@@ -547,7 +552,7 @@ function handleToggleEnabled(row) {
           crudRef.value?.refresh()
         }
       }
-      catch (error) {
+      catch {
         window.$message.error(`${action}失败`)
       }
     },
@@ -568,6 +573,35 @@ async function handleTestConnection(row) {
   catch (error) {
     window.$message.error(`连接测试失败：${error.message || '未知错误'}`)
   }
+}
+
+// 创建存储桶
+function handleCreateBucket(row) {
+  if (!row.bucketName) {
+    window.$message.warning('请先填写存储桶名称')
+    return
+  }
+
+  window.$dialog.info({
+    title: '确认创建',
+    content: `确定要创建存储桶"${row.bucketName}"吗？`,
+    positiveText: '确定',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      try {
+        const res = await request.post(`/system/storage/config/bucket/${row.id}`)
+        if (res.code === 200 && res.data) {
+          window.$message.success('创建桶成功')
+        }
+        else {
+          window.$message.error('创建桶失败')
+        }
+      }
+      catch (error) {
+        window.$message.error(`创建桶失败：${error.message || '未知错误'}`)
+      }
+    },
+  })
 }
 </script>
 

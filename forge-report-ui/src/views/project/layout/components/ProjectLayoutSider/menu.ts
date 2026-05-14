@@ -5,7 +5,7 @@ import { PageEnum } from '@/enums/pageEnum'
 import { MenuOption, MenuGroupOption } from 'naive-ui'
 import { icon } from '@/plugins'
 
-const { TvOutlineIcon, SparklesIcon } = icon.ionicons5
+const { TvOutlineIcon, SparklesIcon, ImagesIcon } = icon.ionicons5
 const { StoreIcon, ObjectStorageIcon, DevicesIcon } = icon.carbon
 export const renderMenuLabel = (option: MenuOption | MenuGroupOption) => {
   return option.label
@@ -31,6 +31,20 @@ export const menuOptionsInit = () => {
           label: () => h('span', null, { default: () => t('project.my') }),
           key: 'my-project',
           children: [
+            {
+              label: () =>
+                h(
+                  RouterLink,
+                  {
+                    to: {
+                      name: PageEnum.BASE_HOME_MATERIALS_NAME,
+                    },
+                  },
+                  { default: () => '素材库' }
+                ),
+              key: PageEnum.BASE_HOME_MATERIALS_NAME,
+              icon: renderIcon(ImagesIcon),
+            },
             {
               label: () =>
                 h(

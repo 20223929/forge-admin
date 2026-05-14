@@ -79,6 +79,14 @@ public class SysFileMetadataServiceImpl extends ServiceImpl<SysFileMetadataMappe
     }
     
     @Override
+    public SysFileMetadata getByFileId(String fileId) {
+        return this.lambdaQuery()
+                .eq(SysFileMetadata::getFileId, fileId)
+                .eq(SysFileMetadata::getStatus, 1)
+                .one();
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public void removeBatch(String[] fileIds) {
         for (String fileId : fileIds) {
@@ -89,5 +97,13 @@ public class SysFileMetadataServiceImpl extends ServiceImpl<SysFileMetadataMappe
                 log.error("删除文件失败: {}", fileId, e);
             }
         }
+    }
+
+    @Override
+    public void rename(String fileId, String originalName) {
+        this.lambdaUpdate()
+                .eq(SysFileMetadata::getFileId, fileId)
+                .set(SysFileMetadata::getOriginalName, originalName)
+                .update();
     }
 }

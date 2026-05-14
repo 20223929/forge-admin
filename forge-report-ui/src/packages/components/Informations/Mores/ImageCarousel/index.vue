@@ -13,16 +13,13 @@
       :show-arrow="showArrow"
       :show-dots="showDots"
     >
-      <n-image
+      <fg-auth-image
         v-for="(url, index) in option.dataset"
-        preview-disabled
         :key="index"
-        :object-fit="fit"
         :src="url"
-        :fallback-src="requireErrorImg()"
-        :width="w"
-        :height="h"
-      ></n-image>
+        :fallback="requireErrorImg()"
+        :img-style="{ width: `${w}px`, height: `${h}px`, objectFit: fit }"
+      ></fg-auth-image>
     </n-carousel>
   </div>
 </template>
@@ -33,6 +30,7 @@ import { requireErrorImg } from '@/utils'
 import { useChartDataFetch } from '@/hooks'
 import { useChartEditStore } from '@/store/modules/chartEditStore/chartEditStore'
 import { option as configOption } from './config'
+import FgAuthImage from '@/components/FgAuthImage/index.vue'
 
 const props = defineProps({
   chartConfig: {

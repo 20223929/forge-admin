@@ -362,6 +362,41 @@ public class RustfsFileStorage implements FileStorage {
             return false;
         }
     }
+
+    @Override
+    public boolean testConnection() {
+        return bucketExists(defaultBucket);
+    }
+
+    @Override
+    public boolean createBucket(String bucketName) {
+        String bucket = bucketName == null || bucketName.isEmpty() ? defaultBucket : bucketName;
+        if (bucketExists(bucket)) {
+            return true;
+        }
+        s3Client.createBucket(CreateBucketRequest.builder().bucket(bucket).build());
+        return true;
+    }
+
+    @Override
+    public boolean deleteBucket(String bucketName) {
+        String bucket = bucketName == null || bucketName.isEmpty() ? defaultBucket : bucketName;
+        s3Client.deleteBucket(DeleteBucketRequest.builder().bucket(bucket).build());
+        return true;
+    }
+
+    @Override
+    public boolean bucketExists(String bucketName) {
+        String bucket = bucketName == null || bucketName.isEmpty() ? defaultBucket : bucketName;
+        try {
+            s3Client.headBucket(HeadBucketRequest.builder().bucket(bucket).build());
+            return true;
+        } catch (NoSuchBucketException e) {
+            return false;
+        } catch (S3Exception e) {
+            return e.statusCode() != 404;
+        }
+    }
     
     private String generateObjectKey(String fileName, String businessType, String businessId) {
         String date = LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy/MM/dd"));

@@ -51,7 +51,14 @@
             :onBeforeUpload="beforeUploadHandle"
           >
             <n-upload-dragger>
-              <img v-if="canvasConfig.backgroundImage" class="upload-show" :src="canvasConfig.backgroundImage" alt="背景" />
+              <fg-auth-image
+                v-if="canvasConfig.backgroundImage"
+                :src="canvasConfig.backgroundImage"
+                class="upload-show"
+                img-class="upload-show-image"
+                alt="背景"
+                :lazy="false"
+              />
               <div class="upload-img" v-show="!canvasConfig.backgroundImage">
                 <img src="@/assets/images/canvas/noImage.png" />
                 <n-text class="upload-desc" depth="3">
@@ -85,12 +92,21 @@
             />
           </label>
           <div class="background-actions">
-            <n-button class="clear-btn" size="small" :disabled="!canvasConfig.backgroundImage" @click="clearImage">
-              清除背景
-            </n-button>
-            <n-button class="clear-btn" size="small" :disabled="!canvasConfig.background" @click="clearColor">
-              清除颜色
-            </n-button>
+            <material-asset-selector
+              :value="canvasConfig.backgroundImage"
+              button-text="从素材库选择"
+              :show-preview="false"
+              @confirm="handleBackgroundMaterialSelect"
+              @clear="clearImage"
+            />
+            <div class="background-button-row">
+              <n-button class="clear-btn" size="small" :disabled="!canvasConfig.backgroundImage" @click="clearImage">
+                清除背景
+              </n-button>
+              <n-button class="clear-btn" size="small" :disabled="!canvasConfig.background" @click="clearColor">
+                清除颜色
+              </n-button>
+            </div>
           </div>
         </div>
       </div>
@@ -162,6 +178,8 @@ import { UploadCustomRequestOptions } from 'naive-ui'
 import { fileToUrl, loadAsyncComponent } from '@/utils'
 import { PreviewScaleEnum } from '@/enums/styleEnum'
 import { icon } from '@/plugins'
+import MaterialAssetSelector from '@/components/Pages/MaterialAssetSelector/index.vue'
+import FgAuthImage from '@/components/FgAuthImage/index.vue'
 
 const { ColorPaletteIcon } = icon.ionicons5
 const { ScaleIcon, FitToScreenIcon, FitToHeightIcon, FitToWidthIcon } = icon.carbon
@@ -309,6 +327,11 @@ const customRequest = (options: UploadCustomRequestOptions) => {
   })
 }
 
+const handleBackgroundMaterialSelect = (value: string) => {
+  chartEditStore.setEditCanvasConfig(EditCanvasConfigEnum.BACKGROUND_IMAGE, value || undefined)
+  chartEditStore.setEditCanvasConfig(EditCanvasConfigEnum.SELECT_COLOR, false)
+}
+
 // 选择适配方式
 const selectPreviewType = (key: PreviewScaleEnum) => {
   chartEditStore.setEditCanvasConfig(EditCanvasConfigEnum.PREVIEW_SCALE_TYPE, key)
@@ -414,7 +437,7 @@ $uploadHeight: 193px;
     @include deep() {
       .n-upload-dragger {
         padding: 5px;
-        width: $uploadWidth;
+        //width: $uploadWidth;
         border-radius: 10px;
         border-color: rgba(var(--app-theme-rgb), 0.12);
         background:
@@ -431,7 +454,15 @@ $uploadHeight: 193px;
       width: -webkit-fill-available;
       height: $uploadHeight;
       border-radius: 6px;
-      object-fit: cover;
+      @include deep() {
+        .upload-show-image {
+          width: 100%;
+          height: $uploadHeight !important;
+          object-fit: cover !important;
+          display: block;
+          border-radius: 6px;
+        }
+      }
     }
     .upload-img {
       display: flex;
@@ -476,7 +507,22 @@ $uploadHeight: 193px;
 
     .background-actions {
       display: flex;
-      gap: 8px;
+      flex-direction: column;
+      gap: 10px;
+
+      @include deep() {
+        .material-selector {
+          .selector-actions {
+            display: flex;
+            gap: 8px;
+          }
+        }
+      }
+
+      .background-button-row {
+        display: flex;
+        gap: 8px;
+      }
 
       .clear-btn {
         flex: 1;

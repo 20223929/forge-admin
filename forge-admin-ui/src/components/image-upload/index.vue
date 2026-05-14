@@ -19,13 +19,17 @@
         <template v-else-if="file.status === 'finished'">
           <img :src="file.url || file.thumbnailUrl" class="image-preview" @click="handlePreview(file)">
           <div class="image-actions">
-            <NIcon class="action-icon" @click="handlePreview(file)">
+            <NIcon class="action-icon" title="预览" @click="handlePreview(file)">
               <EyeOutline />
             </NIcon>
-            <NIcon v-if="!disabled" class="action-icon delete" @click="handleRemoveFile(file)">
+            <NIcon v-if="!disabled" class="action-icon" title="重命名" @click="openRename(file)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+            </NIcon>
+            <NIcon v-if="!disabled" class="action-icon delete" title="删除" @click="handleRemoveFile(file)">
               <TrashOutline />
             </NIcon>
           </div>
+          <div class="image-name" :title="file.name">{{ file.name }}</div>
         </template>
 
         <!-- 上传失败 -->
@@ -96,15 +100,20 @@
     >
       <img :src="previewUrl" style="width: 100%; display: block">
     </NModal>
+    <!-- 重命名弹窗 -->
+    <NModal v-model:show="renameVisible" preset="dialog" title="重命名" positive-text="确定" negative-text="取消" @positive-click="confirmRename">
+      <NInput v-model:value="renameName" placeholder="请输入新文件名" maxlength="255" />
+    </NModal>
   </div>
 </template>
 
 <script setup>
 import { AddOutline, CloseCircleOutline, CloseOutline, EyeOutline, TrashOutline } from '@vicons/ionicons5'
-import { NIcon, NModal, NProgress, NText, NUpload } from 'naive-ui'
-import { computed, ref, watch } from 'vue'
+import { NIcon, NInput, NModal, NProgress, NText, NUpload } from 'naive-ui'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useAuthStore } from '@/store'
-import { generateUUID, getFileUrl } from '@/utils'
+import { useStorageConfig } from '@/composables/useStorageConfig'
+import { generateUUID, getFileUrl, request, resolveRenderableFileUrl } from '@/utils'
 
 const props = defineProps({
   // v-model 绑定的值
@@ -127,10 +136,10 @@ const props = defineProps({
     type: String,
     default: '',
   },
-  // 存储类型
+  // 存储类型 (local/minio/oss等)
   storageType: {
     type: String,
-    default: 'local',
+    default: '',
   },
   // 图片数量限制
   limit: {
@@ -172,10 +181,16 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'success', 'error', 'remove'])
 const authStore = useAuthStore()
+const { storageType: serverStorageType, fileSize: serverFileSize, loadConfig: loadStorageConfig } = useStorageConfig()
+
 const uploadRef = ref(null)
 const fileList = ref([])
 const previewVisible = ref(false)
 const previewUrl = ref('')
+const renameVisible = ref(false)
+const renameFile = ref(null)
+const renameName = ref('')
+let loadSeq = 0
 
 // 缓存文件属性（解决 Naive UI 覆盖自定义属性的问题）
 const filePropsCache = new Map()
@@ -200,69 +215,78 @@ const uploadData = computed(() => {
   return {
     businessType: props.businessType,
     businessId: props.businessId,
-    storageType: props.storageType,
+    storageType: props.storageType || serverStorageType.value,
   }
 })
 
 // 监听 modelValue 变化，初始化文件列表
-watch(() => props.modelValue, async (val) => {
-  if (!val) {
-    fileList.value = []
-    return
-  }
-
-  let list = []
-
-  if (props.valueType === 'array') {
-    list = Array.isArray(val) ? val : []
-  }
-  else {
-    // 字符串格式，逗号分隔
-    list = typeof val === 'string' ? val.split(',').filter(Boolean) : []
-  }
-
-  // 转换为 Naive UI 需要的格式，并转换为 blob URL
-  const token = authStore.accessToken
-  const filePromises = list.map(async (url, index) => {
-    // 使用 getFileUrl 转换为完整的访问 URL
-    const fullUrl = getFileUrl(url)
-
-    const fileItem = {
-      id: `image-${Date.now()}-${index}`,
-      name: extractFileName(url),
-      originalUrl: url,
-      // 如果 url 不包含 /，认为是 fileId
-      fileId: url.includes('/') ? null : url,
-      filePath: url.includes('/') ? url : null,
-      url: fullUrl,
-      thumbnailUrl: fullUrl, // Naive UI image-card 模式需要
-      status: 'finished',
-      percentage: 100,
+watch(() => props.modelValue, (val, oldVal) => {
+  const seq = ++loadSeq
+  ;(async () => {
+    // 上传过程中不要让外部 v-model 回写覆盖当前 file-list，
+    // 否则 Naive Upload 会丢失正在上传文件的内部 id。
+    const hasUploading = fileList.value.some(file => file.status === 'uploading')
+    if (hasUploading) {
+      return
     }
 
-    // 尝试转换为 blob URL
-    try {
-      const response = await fetch(fullUrl, {
-        headers: {
-          Authorization: token ? `Bearer ${token}` : '',
-        },
-      })
+    // 避免同值回写触发重复重建。
+    if (val === oldVal) {
+      return
+    }
 
-      if (response.ok) {
-        const blob = await response.blob()
-        const blobUrl = URL.createObjectURL(blob)
-        fileItem.url = blobUrl
-        fileItem.thumbnailUrl = blobUrl
+    if (!val) {
+      if (seq === loadSeq) {
+        fileList.value = []
       }
-    }
-    catch (err) {
-      console.warn('图片加载失败，使用原始URL:', err)
+      return
     }
 
-    return fileItem
-  })
+    let list = []
 
-  fileList.value = await Promise.all(filePromises)
+    if (props.valueType === 'array') {
+      list = Array.isArray(val) ? val : []
+    }
+    else {
+      // 字符串格式，逗号分隔
+      list = typeof val === 'string' ? val.split(',').filter(Boolean) : []
+    }
+
+    // 转换为 Naive UI 需要的格式，并转换为 blob URL
+    const filePromises = list.map(async (item, index) => {
+      const rawValue = typeof item === 'string' ? item : item?.fileId || item?.filePath || item?.accessUrl || item?.url || ''
+      const isFileId = typeof item === 'string' && !item.includes('/')
+      const fullUrl = await resolveRenderableFileUrl(item)
+
+      let name = (typeof item === 'string' && isFileId) ? rawValue : extractFileName(typeof item === 'string' ? rawValue : (item?.originalName || item?.fileName || rawValue))
+      let metadata = typeof item === 'object' ? item : null
+      if (isFileId) {
+        const resolved = await fetchImageFileName(item)
+        if (resolved) {
+          name = resolved.name
+          metadata = resolved.metadata
+        }
+      }
+
+      return {
+        id: `image-${Date.now()}-${index}`,
+        name,
+        originalUrl: rawValue,
+        fileId: isFileId ? item : item?.fileId || null,
+        filePath: typeof item === 'string' && item.includes('/') ? item : item?.filePath || null,
+        url: fullUrl,
+        thumbnailUrl: fullUrl,
+        status: 'finished',
+        percentage: 100,
+        metadata,
+      }
+    })
+
+    const nextList = await Promise.all(filePromises)
+    if (seq === loadSeq) {
+      fileList.value = nextList
+    }
+  })()
 }, { immediate: true })
 
 // 上传前校验
@@ -290,10 +314,11 @@ function handleBeforeUpload({ file }) {
   }
 
   // 校验文件大小
-  if (props.fileSize) {
-    const isLt = file.file.size / 1024 / 1024 < props.fileSize
+  const maxSize = props.fileSize || serverFileSize.value
+  if (maxSize) {
+    const isLt = file.file.size / 1024 / 1024 < maxSize
     if (!isLt) {
-      window.$message.error(`上传图片大小不能超过 ${props.fileSize}MB！`)
+      window.$message.error(`上传图片大小不能超过 ${maxSize}MB！`)
       return false
     }
   }
@@ -307,18 +332,15 @@ function handleBeforeUpload({ file }) {
   return true
 }
 
-// 上传完成
+// 上传完成（⚠ 必须同步返回，Naive Upload 不等待 Promise）
 function handleFinish({ file, event }) {
   try {
     const response = JSON.parse(event.target.response)
 
     if (response.code === 200) {
       const fileData = response.data
-
-      // 使用 getFileUrl 构建完整的访问URL
       const accessUrl = getFileUrl(fileData)
 
-      // 设置文件属性
       if (!file.id) {
         file.id = fileData.fileId || `image-${Date.now()}`
       }
@@ -334,7 +356,7 @@ function handleFinish({ file, event }) {
         }
       }
 
-      // 缓存文件属性（关键！）
+      // 缓存文件属性
       const cachedProps = {
         fileId: fileData.fileId,
         filePath: fileData.filePath,
@@ -344,17 +366,30 @@ function handleFinish({ file, event }) {
       }
       filePropsCache.set(file.id, cachedProps)
 
-      // 设置文件属性
       Object.assign(file, cachedProps)
       file.status = 'finished'
       file.percentage = 100
 
-      window.$message.success('图片上传成功')
+      // 后台异步解析 blob URL 以优化非本地文件的展示
+      resolveRenderableFileUrl(fileData).then((blobUrl) => {
+        if (blobUrl) {
+          const cached = filePropsCache.get(file.id)
+          if (cached) {
+            cached.url = blobUrl
+            cached.thumbnailUrl = blobUrl
+            // 同步更新本地 fileList 中的引用
+            const idx = fileList.value.findIndex(f => f.id === file.id)
+            if (idx > -1) {
+              fileList.value[idx].url = blobUrl
+              fileList.value[idx].thumbnailUrl = blobUrl
+            }
+          }
+        }
+      })
 
-      // 触发成功事件
+      window.$message.success('图片上传成功')
       emit('success', fileData)
 
-      // 延迟更新值
       setTimeout(() => {
         emitValue()
       }, 100)
@@ -398,11 +433,36 @@ function handleRemoveFile(file) {
   const index = fileList.value.findIndex(f => f.id === file.id)
   if (index > -1) {
     fileList.value.splice(index, 1)
-    // 清除缓存
     filePropsCache.delete(file.id)
-    // 触发事件
     emit('remove', file)
     emitValue()
+  }
+}
+
+// 重命名
+function openRename(file) {
+  renameFile.value = file
+  renameName.value = file.name || file.metadata?.originalName || ''
+  renameVisible.value = true
+}
+
+async function confirmRename() {
+  const file = renameFile.value
+  const newName = renameName.value.trim()
+  if (!file || !newName) return
+  try {
+    // 更新本地显示
+    file.name = newName
+    const cached = filePropsCache.get(file.id)
+    if (cached && cached.metadata) cached.metadata.originalName = newName
+    // 更新后端
+    await request.put(`/system/file/metadata/rename?fileId=${encodeURIComponent(file.fileId)}&originalName=${encodeURIComponent(newName)}`)
+    window.$message.success('重命名成功')
+  } catch (e) {
+    window.$message.error('重命名失败')
+  }
+  finally {
+    renameVisible.value = false
   }
 }
 
@@ -415,22 +475,8 @@ async function handlePreview(file) {
     return
   }
 
-  // 通过 fetch 获取图片并转换为 blob URL（带 token）
   try {
-    const token = authStore.accessToken
-    const response = await fetch(file.url, {
-      headers: {
-        Authorization: token ? `Bearer ${token}` : '',
-      },
-    })
-
-    if (!response.ok) {
-      throw new Error('图片加载失败')
-    }
-
-    const blob = await response.blob()
-    const blobUrl = URL.createObjectURL(blob)
-    previewUrl.value = blobUrl
+    previewUrl.value = await resolveRenderableFileUrl(file.fileId || file.originalUrl || file.filePath || file.url)
     previewVisible.value = true
   }
   catch (error) {
@@ -471,14 +517,6 @@ function handleFileListChange(newFileList) {
 function emitValue() {
   const finishedFiles = fileList.value.filter(file => file.status === 'finished')
 
-  console.log('[ImageUpload] emitValue - finishedFiles:', finishedFiles.map(f => ({
-    id: f.id,
-    fileId: f.fileId,
-    filePath: f.filePath,
-    originalUrl: f.originalUrl,
-    status: f.status,
-  })))
-
   if (props.valueType === 'array') {
     // 返回数组（优先使用 fileId，其次 filePath，再其次 originalUrl）
     const result = finishedFiles.map((file) => {
@@ -489,7 +527,6 @@ function emitValue() {
       }
       return value
     }).filter(Boolean)
-    console.log('[ImageUpload] emit array result:', result)
     emit('update:modelValue', result)
   }
   else {
@@ -502,7 +539,6 @@ function emitValue() {
       }
       return value
     }).filter(Boolean).join(',')
-    console.log('[ImageUpload] emit string result:', result)
     emit('update:modelValue', result)
   }
 }
@@ -519,6 +555,17 @@ function extractFileName(path) {
   return path
 }
 
+// 获取真实文件名（同步等待结果）
+async function fetchImageFileName(fileId) {
+  try {
+    const res = await request.get(`/system/file/metadata/byFileId/${fileId}`)
+    if (res?.code === 200 && res.data?.originalName) {
+      return { name: res.data.originalName, metadata: res.data }
+    }
+  } catch { /* 静默 */ }
+  return null
+}
+
 // 暴露方法
 defineExpose({
   submit: () => uploadRef.value?.submit(),
@@ -526,6 +573,11 @@ defineExpose({
     fileList.value = []
     emitValue()
   },
+})
+
+// 组件挂载时加载存储配置
+onMounted(() => {
+  loadStorageConfig()
 })
 </script>
 
@@ -593,6 +645,17 @@ defineExpose({
 
 .action-icon.delete:hover {
   color: #ff4d4f;
+}
+
+.image-name {
+  padding: 2px 4px;
+  font-size: 11px;
+  color: #666;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.5;
 }
 
 .uploading-mask {

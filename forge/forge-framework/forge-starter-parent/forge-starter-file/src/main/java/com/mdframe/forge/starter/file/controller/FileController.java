@@ -72,6 +72,36 @@ public class FileController {
         boolean success = fileManager.delete(fileId);
         return RespInfo.success(success);
     }
+
+    /**
+     * 创建存储桶/本地目录
+     */
+    @PostMapping("/bucket")
+    public RespInfo<Boolean> createBucket(
+            @RequestParam("storageType") String storageType,
+            @RequestParam("bucketName") String bucketName) {
+        return RespInfo.success(fileManager.createBucket(storageType, bucketName));
+    }
+
+    /**
+     * 删除存储桶/本地目录
+     */
+    @DeleteMapping("/bucket")
+    public RespInfo<Boolean> deleteBucket(
+            @RequestParam("storageType") String storageType,
+            @RequestParam("bucketName") String bucketName) {
+        return RespInfo.success(fileManager.deleteBucket(storageType, bucketName));
+    }
+
+    /**
+     * 检查存储桶/本地目录是否存在
+     */
+    @GetMapping("/bucket/exists")
+    public RespInfo<Boolean> bucketExists(
+            @RequestParam("storageType") String storageType,
+            @RequestParam("bucketName") String bucketName) {
+        return RespInfo.success(fileManager.bucketExists(storageType, bucketName));
+    }
     
     /**
      * 分片上传 - 初始化

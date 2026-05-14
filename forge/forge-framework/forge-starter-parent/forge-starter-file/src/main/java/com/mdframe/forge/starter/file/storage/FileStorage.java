@@ -106,4 +106,41 @@ public interface FileStorage {
      * @return 是否存在
      */
     boolean exists(String fileId);
+
+    /**
+     * 测试当前存储连接
+     */
+    default boolean testConnection() {
+        return true;
+    }
+
+    /**
+     * 创建存储桶
+     *
+     * @param bucketName 存储桶名称
+     * @return 是否创建成功
+     */
+    default boolean createBucket(String bucketName) {
+        return false;
+    }
+
+    /**
+     * 删除存储桶
+     *
+     * @param bucketName 存储桶名称
+     * @return 是否删除成功
+     */
+    default boolean deleteBucket(String bucketName) {
+        return false;
+    }
+
+    /**
+     * 检查存储桶是否存在
+     *
+     * @param bucketName 存储桶名称
+     * @return 是否存在
+     */
+    default boolean bucketExists(String bucketName) {
+        return false;
+    }
 }

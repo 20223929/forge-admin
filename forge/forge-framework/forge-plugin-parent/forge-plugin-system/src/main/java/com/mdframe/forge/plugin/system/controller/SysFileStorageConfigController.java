@@ -94,4 +94,20 @@ public class SysFileStorageConfigController {
     public RespInfo<Boolean> testConnection(@PathVariable Long id) {
         return RespInfo.success(storageConfigService.testConnection(id));
     }
+
+    /**
+     * 获取默认存储配置（前端上传组件用）
+     */
+    @GetMapping("/default")
+    public RespInfo<SysFileStorageConfig> getDefault() {
+        return RespInfo.success(storageConfigService.getDefaultConfig());
+    }
+
+    /**
+     * 创建存储桶/本地目录
+     */
+    @PostMapping("/bucket/{id}")
+    public RespInfo<Boolean> createBucket(@PathVariable Long id) {
+        return RespInfo.success(storageConfigService.createBucket(id));
+    }
 }

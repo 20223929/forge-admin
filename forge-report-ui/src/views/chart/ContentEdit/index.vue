@@ -83,7 +83,7 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, computed, provide, watch } from 'vue'
+import { onMounted, computed, provide, watch, ref } from 'vue'
 import { chartColors } from '@/settings/chartThemes/index'
 import { MenuEnum } from '@/enums/editPageEnum'
 import { CreateComponentType, CreateComponentGroupType } from '@/packages/index.d'
@@ -97,6 +97,7 @@ import { useAddKeyboard } from '../hooks/useKeyboard.hook'
 import { dragHandle, dragoverHandle, mousedownHandleUnStop, useMouseHandle } from './hooks/useDrag.hook'
 import { useComponentStyle, useSizeStyle } from './hooks/useStyle.hook'
 import { useInitVChartsTheme } from '@/hooks'
+import { resolveAssetSourceUrl } from '@/utils'
 
 import { ContentBox } from '../ContentBox/index'
 import { EditGroup } from './components/EditGroup'
@@ -108,6 +109,7 @@ import { EditTools } from './components/EditTools'
 
 const chartEditStore = useChartEditStore()
 const { handleContextMenu } = useContextMenu()
+const resolvedBackgroundImage = ref('')
 
 // 编辑时注入scale变量，消除警告
 provide(SCALE_KEY, null)
@@ -163,13 +165,15 @@ const filterShow = computed(() => {
 const rangeStyle = computed(() => {
   // 设置背景色和图片背景
   const background = chartEditStore.getEditCanvasConfig.background
-  const backgroundImage = chartEditStore.getEditCanvasConfig.backgroundImage
+  const backgroundImage = resolvedBackgroundImage.value
   const selectColor = chartEditStore.getEditCanvasConfig.selectColor
   const backgroundColor = background ? background : undefined
 
   const computedBackground = selectColor
     ? { background: backgroundColor }
-    : { background: `url(${backgroundImage}) no-repeat center center / cover !important` }
+    : backgroundImage
+      ? { background: `url(${backgroundImage}) no-repeat center center / cover !important` }
+      : {}
 
   return {
     ...computedBackground,
@@ -177,6 +181,14 @@ const rangeStyle = computed(() => {
     height: 'inherit'
   }
 })
+
+watch(
+  () => chartEditStore.getEditCanvasConfig.backgroundImage,
+  async (newValue) => {
+    resolvedBackgroundImage.value = newValue ? await resolveAssetSourceUrl(newValue) : ''
+  },
+  { immediate: true }
+)
 
 // 处理全局的 vChart 主题
 useInitVChartsTheme(chartEditStore)

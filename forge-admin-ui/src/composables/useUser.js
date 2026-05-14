@@ -7,7 +7,7 @@ import { useRouter } from 'vue-router'
 import api from '@/api'
 import { defaultThemeConfig } from '@/config/theme.config.js'
 import { useAuthStore, useUserStore } from '@/store'
-import { getFileUrl } from '@/utils/file'
+import { resolveRenderableFileUrl } from '@/utils/file'
 
 /**
  * 默认用户下拉菜单选项
@@ -65,17 +65,7 @@ export function useUser() {
       return
     }
     try {
-      const url = getFileUrl(avatar)
-      const response = await fetch(url, {
-        headers: { Authorization: `Bearer ${authStore.accessToken}` },
-      })
-      if (response.ok) {
-        const blob = await response.blob()
-        userAvatar.value = URL.createObjectURL(blob)
-      }
-      else {
-        userAvatar.value = ''
-      }
+      userAvatar.value = await resolveRenderableFileUrl(avatar)
     }
     catch {
       userAvatar.value = ''

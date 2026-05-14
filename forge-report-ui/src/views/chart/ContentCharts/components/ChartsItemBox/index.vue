@@ -140,10 +140,9 @@ const deleteHandle = (item: ConfigType, index: number) => {
   goDialog({
     message: '是否删除此图片？',
     transformOrigin: 'center',
-    onPositiveCallback: () => {
+    onPositiveCallback: async () => {
       const packagesStore = usePackagesStore()
-      emit('deletePhoto', item, index)
-      packagesStore.deletePhotos(item, index)
+      await packagesStore.deletePhotos(item)
     }
   })
 }

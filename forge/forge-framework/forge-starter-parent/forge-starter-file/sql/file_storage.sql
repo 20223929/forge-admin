@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS sys_file_storage_config (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键',
     config_name VARCHAR(100) NOT NULL COMMENT '配置名称',
-    storage_type VARCHAR(50) NOT NULL COMMENT '存储类型(local/minio/aliyun_oss等)',
+    storage_type VARCHAR(50) NOT NULL COMMENT '存储类型(local/rustfs/minio/aliyun/tencent等)',
     is_default TINYINT(1) DEFAULT 0 COMMENT '是否默认策略',
     enabled TINYINT(1) DEFAULT 1 COMMENT '是否启用',
     endpoint VARCHAR(500) COMMENT '访问端点',
@@ -72,3 +72,9 @@ INSERT INTO sys_file_storage_config
 (config_name, storage_type, is_default, enabled, endpoint, access_key, secret_key, bucket_name, use_https, max_file_size, allowed_types, order_num)
 VALUES 
 ('MinIO存储', 'minio', 0, 0, 'http://localhost:9000', 'minioadmin', 'minioadmin', 'forge-files', 0, 500, 'jpg,jpeg,png,gif,pdf,doc,docx,xls,xlsx,zip,rar,mp4,mp3', 2);
+
+-- 腾讯云 COS 配置示例（bucket_name 需使用完整桶名，如 forge-files-1250000000）
+INSERT INTO sys_file_storage_config
+(config_name, storage_type, is_default, enabled, access_key, secret_key, bucket_name, region, use_https, max_file_size, allowed_types, order_num)
+VALUES
+('腾讯云COS', 'tencent', 0, 0, 'SecretId', 'SecretKey', 'forge-files-1250000000', 'ap-guangzhou', 1, 500, 'jpg,jpeg,png,gif,pdf,doc,docx,xls,xlsx,zip,rar,mp4,mp3', 3);

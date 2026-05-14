@@ -335,7 +335,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useAuthStore, useUserStore } from '@/store'
 import { request } from '@/utils'
-import { getFileUrl } from '@/utils/file'
+import { resolveRenderableFileUrl } from '@/utils/file'
 
 defineOptions({ name: 'Profile' })
 
@@ -693,14 +693,7 @@ async function loadAvatar() {
     return
   }
   try {
-    const url = getFileUrl(avatar)
-    const response = await fetch(url, {
-      headers: { Authorization: `Bearer ${authStore.accessToken}` },
-    })
-    if (response.ok) {
-      const blob = await response.blob()
-      avatarSrc.value = URL.createObjectURL(blob)
-    }
+    avatarSrc.value = await resolveRenderableFileUrl(avatar)
   }
   catch {
     avatarSrc.value = ''

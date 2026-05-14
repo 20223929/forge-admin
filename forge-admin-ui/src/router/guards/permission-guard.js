@@ -2,7 +2,7 @@ import api from '@/api'
 import { WHITE_LIST } from '@/config/whitelist.config.js'
 import { useAppStore, useAuthStore, usePermissionStore, useTenantStore, useUserStore } from '@/store'
 import { getPermissions, getUserInfo } from '@/store/helper'
-import { getFileUrl, initWebSocketClient, lStorage, request } from '@/utils'
+import { initWebSocketClient, lStorage, request, resolveRenderableFileUrl } from '@/utils'
 import { initKeyExchange } from '@/utils/crypto/key-exchange'
 
 // 应用租户配置
@@ -70,15 +70,17 @@ function applyTenantConfig(tenantConfig, appStore) {
     const link = document.querySelector('link[rel*=\'icon\']') || document.createElement('link')
     link.type = 'image/x-icon'
     link.rel = 'shortcut icon'
-    // 使用 getFileUrl 转换 fileId 为完整的下载 URL
+    // 浏览器图标可能只返回相对路径，先解析成可直接访问的地址再挂载到 head。
     const iconUrl = tenantConfig.browserIcon
-    if (iconUrl.startsWith('http://') || iconUrl.startsWith('https://') || iconUrl.startsWith('data:')) {
-      link.href = iconUrl
-    }
-    else {
-      link.href = getFileUrl(iconUrl)
-    }
-    document.getElementsByTagName('head')[0].appendChild(link)
+    resolveRenderableFileUrl(iconUrl)
+      .then((url) => {
+        link.href = url || iconUrl
+        document.getElementsByTagName('head')[0].appendChild(link)
+      })
+      .catch(() => {
+        link.href = iconUrl
+        document.getElementsByTagName('head')[0].appendChild(link)
+      })
   }
 }
 

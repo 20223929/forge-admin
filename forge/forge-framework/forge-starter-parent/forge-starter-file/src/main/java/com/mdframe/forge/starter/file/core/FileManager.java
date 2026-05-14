@@ -62,6 +62,9 @@ public class FileManager {
         }
         
         StorageConfig config = configProvider.getDefaultConfig();
+        if (config == null) {
+            throw new RuntimeException("未找到默认存储配置");
+        }
         return upload(file, businessType, businessId, config.getStorageType());
     }
     
@@ -72,12 +75,14 @@ public class FileManager {
         // 验证文件
         validateFile(file, storageType);
         
-        // 秒传检查
+        // 秒传检查：仅当 businessType 和 businessId 也一致时才复用
         String md5 = FileUtil.calculateMd5(file);
         if (metadataPersistence != null) {
             FileMetadata existing = metadataPersistence.getByMd5(md5);
-            if (existing != null) {
-                log.info("文件秒传: md5={}", md5);
+            if (existing != null
+                    && java.util.Objects.equals(existing.getBusinessType(), businessType)
+                    && java.util.Objects.equals(existing.getBusinessId(), businessId)) {
+                log.info("文件秒传: md5={}, businessType={}", md5, businessType);
                 return existing;
             }
         }
@@ -254,6 +259,72 @@ public class FileManager {
         
         return metadata;
     }
+
+    /**
+     * 测试存储连接
+     */
+    public boolean testConnection(String storageType) {
+        FileStorage storage = getStorage(storageType);
+        if (storage == null) {
+            throw new RuntimeException("不支持的存储类型: " + storageType);
+        }
+        return storage.testConnection();
+    }
+
+    /**
+     * 创建存储桶
+     */
+    public boolean createBucket(String storageType, String bucketName) {
+        FileStorage storage = getStorage(storageType);
+        if (storage == null) {
+            throw new RuntimeException("不支持的存储类型: " + storageType);
+        }
+        return storage.createBucket(bucketName);
+    }
+
+    /**
+     * 删除存储桶
+     */
+    public boolean deleteBucket(String storageType, String bucketName) {
+        FileStorage storage = getStorage(storageType);
+        if (storage == null) {
+            throw new RuntimeException("不支持的存储类型: " + storageType);
+        }
+        return storage.deleteBucket(bucketName);
+    }
+
+    /**
+     * 检查存储桶是否存在
+     */
+    public boolean bucketExists(String storageType, String bucketName) {
+        FileStorage storage = getStorage(storageType);
+        if (storage == null) {
+            throw new RuntimeException("不支持的存储类型: " + storageType);
+        }
+        return storage.bucketExists(bucketName);
+    }
+
+    /**
+     * 重新加载已启用的存储配置
+     */
+    public void refreshConfiguredStorages() {
+        if (configProvider == null) {
+            log.warn("未配置StorageConfigProvider，跳过存储策略刷新");
+            return;
+        }
+
+        configProvider.getAllEnabledConfigs().forEach(config -> {
+            FileStorage storage = getStorage(config.getStorageType());
+            if (storage != null) {
+                try {
+                    storage.init(config);
+                    log.info("刷新文件存储策略: {} - {}", config.getStorageType(), config.getConfigName());
+                } catch (Exception e) {
+                    log.warn("刷新文件存储策略失败: {} - {}", config.getStorageType(), config.getConfigName(), e);
+                }
+            }
+        });
+    }
     
     /**
      * 验证文件
@@ -289,4 +360,5 @@ public class FileManager {
             }
         }
     }
+
 }

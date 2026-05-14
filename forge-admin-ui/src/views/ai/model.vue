@@ -28,9 +28,9 @@ import { NAvatar } from 'naive-ui'
 import { computed, h, onMounted, ref } from 'vue'
 import { providerPage } from '@/api/ai'
 import { AiCrudPage } from '@/components/ai-form'
+import AuthImage from '@/components/common/AuthImage.vue'
 import DictTag from '@/components/DictTag.vue'
 import { useDict } from '@/composables/useDict'
-import { getFileUrl } from '@/utils/file'
 
 defineOptions({ name: 'AiModel' })
 
@@ -99,7 +99,12 @@ const tableColumns = computed(() => [
     width: 60,
     render: (row) => {
       if (row.icon) {
-        return h(NAvatar, { src: getFileUrl(row.icon), size: 28, round: true })
+        return h(AuthImage, {
+          src: row.icon,
+          imgClass: 'h-28px w-28px rounded-50% object-cover',
+        }, {
+          placeholder: () => h(NAvatar, { size: 28, round: true }, { default: () => (row.modelName || '-').charAt(0) }),
+        })
       }
       return h(NAvatar, { size: 28, round: true }, { default: () => (row.modelName || '-').charAt(0) })
     },

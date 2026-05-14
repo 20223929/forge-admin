@@ -7,7 +7,8 @@ const importPath = {
   'PageEnum.BASE_HOME_ITEMS_NAME': () => import('@/views/project/items/index.vue'),
   'PageEnum.BASE_HOME_TEMPLATE_NAME': () => import('@/views/project/mtTemplate/index.vue'),
   'PageEnum.BASE_HOME_TEMPLATE_MARKET_NAME': () => import('@/views/project/templateMarket/index.vue'),
-  'PageEnum.BASE_HOME_AI_PROVIDER_NAME': () => import('@/views/project/settings/AiSettings.vue')
+  'PageEnum.BASE_HOME_AI_PROVIDER_NAME': () => import('@/views/project/settings/AiSettings.vue'),
+  'PageEnum.BASE_HOME_MATERIALS_NAME': () => import('@/views/project/materials/index.vue')
 }
 
 const projectRoutes: RouteRecordRaw = {
@@ -50,6 +51,15 @@ const projectRoutes: RouteRecordRaw = {
       component: importPath['PageEnum.BASE_HOME_AI_PROVIDER_NAME'],
       meta: {
         title: 'AI 供应商配置',
+        noKeepAlive: true
+      }
+    },
+    {
+      path: PageEnum.BASE_HOME_MATERIALS,
+      name: PageEnum.BASE_HOME_MATERIALS_NAME,
+      component: importPath['PageEnum.BASE_HOME_MATERIALS_NAME'],
+      meta: {
+        title: '素材库',
         noKeepAlive: true
       }
     }

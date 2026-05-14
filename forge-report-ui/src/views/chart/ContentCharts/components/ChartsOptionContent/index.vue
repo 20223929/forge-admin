@@ -40,21 +40,53 @@
         <charts-item-box :menuOptions="packages.selectOptions" @deletePhoto="deleteHandle"></charts-item-box>
       </n-scrollbar>
     </div>
+
+    <n-modal
+      v-model:show="packagesStore.materialUploadVisible"
+      preset="card"
+      title="上传素材图片"
+      style="width: 520px"
+    >
+      <div class="material-upload-modal">
+        <n-select
+          v-model:value="materialUploadCategory"
+          :options="materialCategoryUploadOptions"
+          placeholder="选择素材分类"
+        />
+        <n-upload
+          accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+          :show-file-list="false"
+          :custom-request="handleMaterialUpload"
+        >
+          <n-button type="primary" block :loading="materialUploading">
+            选择图片并上传到素材库
+          </n-button>
+        </n-upload>
+        <div class="material-upload-tip">
+          上传成功后会自动出现在左侧图片素材列表里。
+        </div>
+      </div>
+    </n-modal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, computed, reactive } from 'vue'
-import { ConfigType } from '@/packages/index.d'
+import { ConfigType, PackagesCategoryEnum } from '@/packages/index.d'
 import { useSettingStore } from '@/store/modules/settingStore/settingStore'
 import { loadAsyncComponent } from '@/utils'
 import { usePackagesStore } from '@/store/modules/packagesStore/packagesStore'
 import { icon } from '@/plugins'
+import { REPORT_MATERIAL_BUSINESS_TYPE, reportMaterialCategoryOptions, uploadFileApi } from '@/api/file'
+import type { UploadCustomRequestOptions } from 'naive-ui'
 
 const { ChevronDownIcon } = icon.ionicons5
 
 const ChartsItemBox = loadAsyncComponent(() => import('../ChartsItemBox/index.vue'))
 const packagesStore = usePackagesStore()
+const materialUploading = ref(false)
+const materialUploadCategory = ref('background')
+const materialCategoryUploadOptions = reportMaterialCategoryOptions.filter(item => item.value !== 'all')
 
 const props = defineProps({
   selectOptions: {
@@ -101,35 +133,41 @@ const setSelectOptions = (categorys: any) => {
   }
 }
 
+const rebuildPackagesCategory = (newData: { list: ConfigType[] }) => {
+  packages.categorysNum = 0
+  packages.menuOptions = []
+  packages.categorys = {
+    all: []
+  }
+  packages.categoryNames = {
+    all: '所有'
+  }
+  if (!newData) return
+  newData.list.forEach((e: ConfigType) => {
+    const value: ConfigType[] = (packages.categorys as any)[e.category]
+    packages.categorys[e.category] = value && value.length ? [...value, e] : [e]
+    packages.categoryNames[e.category] = e.categoryName
+    packages.categorys['all'].push(e)
+  })
+  for (const val in packages.categorys) {
+    packages.categorysNum += 1
+    packages.menuOptions.push({
+      key: val,
+      label: packages.categoryNames[val]
+    })
+  }
+  setSelectOptions(packages.categorys)
+  selectValue.value = packages.menuOptions[0]['key']
+}
+
 watch(
   // @ts-ignore
   () => props.selectOptions,
-  (newData: { list: ConfigType[] }) => {
-    packages.categorysNum = 0
-    packages.menuOptions = []
-    packages.categorys = {
-      all: []
+  async (newData: { list: ConfigType[]; key?: string }) => {
+    if (newData?.key === PackagesCategoryEnum.PHOTOS) {
+      await packagesStore.loadMaterialPhotos()
     }
-    packages.categoryNames = {
-      all: '所有'
-    }
-    if (!newData) return
-    newData.list.forEach((e: ConfigType) => {
-      const value: ConfigType[] = (packages.categorys as any)[e.category]
-      packages.categorys[e.category] = value && value.length ? [...value, e] : [e]
-      packages.categoryNames[e.category] = e.categoryName
-      packages.categorys['all'].push(e)
-    })
-    for (const val in packages.categorys) {
-      packages.categorysNum += 1
-      packages.menuOptions.push({
-        key: val,
-        label: packages.categoryNames[val]
-      })
-    }
-    setSelectOptions(packages.categorys)
-    // 默认选中处理
-    selectValue.value = packages.menuOptions[0]['key']
+    rebuildPackagesCategory(newData)
   },
   {
     immediate: true
@@ -137,12 +175,11 @@ watch(
 )
 
 watch(
-  () => packagesStore.newPhoto,
-  newPhoto => {
-    if (!newPhoto) return
-    const newPhotoCategory = newPhoto.category
-    packages.categorys[newPhotoCategory].splice(1, 0, newPhoto)
-    packages.categorys['all'].splice(1, 0, newPhoto)
+  () => packagesStore.materialPhotosVersion,
+  () => {
+    if (props.selectOptions?.key === PackagesCategoryEnum.PHOTOS) {
+      rebuildPackagesCategory(props.selectOptions as { list: ConfigType[] })
+    }
   }
 )
 
@@ -156,6 +193,30 @@ const deleteHandle = (item: ConfigType, index: number) => {
 const clickItemHandle = (key: string) => {
   selectValue.value = key
   packages.selectOptions = packages.categorys[key]
+}
+
+const handleMaterialUpload = async (options: UploadCustomRequestOptions) => {
+  const rawFile = options.file.file
+  if (!rawFile) {
+    return
+  }
+  materialUploading.value = true
+  try {
+    const res = await uploadFileApi(rawFile as File, REPORT_MATERIAL_BUSINESS_TYPE, materialUploadCategory.value)
+    if (res.code === 200) {
+      options.onFinish?.()
+      packagesStore.closeMaterialUploadDialog()
+      await packagesStore.loadMaterialPhotos()
+      window['$message']?.success('素材上传成功')
+    } else {
+      throw new Error(res.msg || '素材上传失败')
+    }
+  } catch (error: any) {
+    options.onError?.()
+    window['$message']?.error(error?.message || '素材上传失败')
+  } finally {
+    materialUploading.value = false
+  }
 }
 </script>
 
@@ -291,6 +352,17 @@ $workbenchGapHeight: 24px;
     flex-direction: column;
     align-items: center;
   }
+}
+
+.material-upload-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.material-upload-tip {
+  font-size: 12px;
+  color: rgba(148, 163, 184, 0.92);
 }
 </style>
 

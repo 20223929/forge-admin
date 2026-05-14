@@ -1,8 +1,18 @@
 <template>
   <collapse-item name="属性" :expanded="true">
+    <setting-item-box name="素材" :alone="true">
+      <setting-item>
+        <material-asset-selector
+          :value="optionData.dataset"
+          button-text="从素材库选择图片"
+          @confirm="handleMaterialSelect"
+          @clear="handleMaterialClear"
+        />
+      </setting-item>
+    </setting-item-box>
     <setting-item-box name="路径" :alone="true">
       <setting-item>
-        <n-input v-model:value="optionData.dataset" size="small"></n-input>
+        <n-input v-model:value="optionData.dataset" size="small" placeholder="可手填外链，或从素材库选择"></n-input>
       </setting-item>
     </setting-item-box>
     <setting-item-box name="样式">
@@ -28,6 +38,7 @@
 <script setup lang="ts">
 import { PropType } from 'vue'
 import { option } from './config'
+import MaterialAssetSelector from '@/components/Pages/MaterialAssetSelector/index.vue'
 import {
   CollapseItem,
   SettingItemBox,
@@ -40,6 +51,14 @@ const props = defineProps({
     required: true,
   },
 })
+
+const handleMaterialSelect = (value: string) => {
+  props.optionData.dataset = value
+}
+
+const handleMaterialClear = () => {
+  props.optionData.dataset = ''
+}
 
 // 适应类型
 const fitList = [

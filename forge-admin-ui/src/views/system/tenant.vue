@@ -66,7 +66,7 @@ import { TrashOutline } from '@vicons/ionicons5'
 import { NIcon, NTag } from 'naive-ui'
 import { computed, h, ref } from 'vue'
 import { AiCrudPage } from '@/components/ai-form'
-import { getFileUrl, request } from '@/utils'
+import { request, resolveRenderableFileUrl } from '@/utils'
 
 defineOptions({ name: 'SystemTenant' })
 
@@ -626,15 +626,17 @@ async function handleSubmitSuccess() {
       const link = document.querySelector('link[rel*=\'icon\']') || document.createElement('link')
       link.type = 'image/x-icon'
       link.rel = 'shortcut icon'
-      // 使用 getFileUrl 转换 fileId 为完整的下载 URL
+      // 浏览器图标可能只返回相对路径，先解析成可直接访问的地址再挂载到 head。
       const iconUrl = tenantConfig.browserIcon
-      if (iconUrl.startsWith('http://') || iconUrl.startsWith('https://') || iconUrl.startsWith('data:')) {
-        link.href = iconUrl
-      }
-      else {
-        link.href = getFileUrl(iconUrl)
-      }
-      document.getElementsByTagName('head')[0].appendChild(link)
+      resolveRenderableFileUrl(iconUrl)
+        .then((url) => {
+          link.href = url || iconUrl
+          document.getElementsByTagName('head')[0].appendChild(link)
+        })
+        .catch(() => {
+          link.href = iconUrl
+          document.getElementsByTagName('head')[0].appendChild(link)
+        })
     }
 
     window.$message.success('主题配置已更新')

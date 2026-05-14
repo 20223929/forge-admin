@@ -29,4 +29,14 @@ public interface ISysFileStorageConfigService extends IService<SysFileStorageCon
      * 测试连接
      */
     boolean testConnection(Long id);
+
+    /**
+     * 创建存储桶
+     */
+    boolean createBucket(Long id);
+
+    /**
+     * 查询默认配置
+     */
+    SysFileStorageConfig getDefaultConfig();
 }

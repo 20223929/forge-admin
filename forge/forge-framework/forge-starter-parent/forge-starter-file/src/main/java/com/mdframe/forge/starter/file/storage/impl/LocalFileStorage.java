@@ -326,6 +326,34 @@ public class LocalFileStorage implements FileStorage {
         File file = new File(fullPath);
         return file.exists();
     }
+
+    @Override
+    public boolean testConnection() {
+        File dir = new File(basePath);
+        return dir.exists() && dir.isDirectory() && dir.canWrite();
+    }
+
+    @Override
+    public boolean createBucket(String bucketName) {
+        String dirName = bucketName == null || bucketName.isEmpty() ? "" : bucketName;
+        File dir = dirName.isEmpty() ? new File(basePath) : new File(basePath, dirName);
+        return dir.exists() || dir.mkdirs();
+    }
+
+    @Override
+    public boolean deleteBucket(String bucketName) {
+        if (bucketName == null || bucketName.isEmpty()) {
+            return false;
+        }
+        return FileUtil.del(new File(basePath, bucketName));
+    }
+
+    @Override
+    public boolean bucketExists(String bucketName) {
+        String dirName = bucketName == null || bucketName.isEmpty() ? "" : bucketName;
+        File dir = dirName.isEmpty() ? new File(basePath) : new File(basePath, dirName);
+        return dir.exists() && dir.isDirectory();
+    }
     
     /**
      * 生成存储文件名

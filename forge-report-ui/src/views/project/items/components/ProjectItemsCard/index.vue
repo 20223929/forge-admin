@@ -2,15 +2,13 @@
   <div v-if="cardData" class="go-items-list-card">
     <div class="card-inner">
       <div class="card-image" @click="resizeHandle">
-        <n-image
-          object-fit="contain"
-          height="170"
-          preview-disabled
-          :src="imageSrc"
+        <fg-auth-image
+          :src="cardData.indexImg"
           :alt="cardData.title"
-          :fallback-src="requireErrorImg()"
-          class="!w-full"
-        ></n-image>
+          :fallback="requireErrorImg()"
+          img-class="card-cover"
+          :img-style="{ width: '100%', height: '170px', objectFit: 'contain', display: 'block' }"
+        ></fg-auth-image>
         <div class="image-overlay">
           <div class="overlay-scan"></div>
           <div class="overlay-gradient"></div>
@@ -57,40 +55,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onUnmounted } from 'vue'
-import { renderIcon, renderLang, requireErrorImg, fetchPathByName, routerTurnByPath, getLocalStorage } from '@/utils'
+import { ref } from 'vue'
+import { renderIcon, renderLang, requireErrorImg, fetchPathByName, routerTurnByPath } from '@/utils'
 import { icon } from '@/plugins'
 import { Chartype } from '../../index.d'
 import { PreviewEnum } from '@/enums/pageEnum'
-import { StorageEnum } from '@/enums/storageEnum'
 import { publishProjectApi } from '@/api/project'
+import FgAuthImage from '@/components/FgAuthImage/index.vue'
 const { EllipsisHorizontalCircleSharpIcon, TrashIcon, HammerIcon, BrowsersOutlineIcon, SendIcon } = icon.ionicons5
 
 const emit = defineEmits(['delete', 'resize', 'edit', 'refresh'])
 
 const props = defineProps({ cardData: Object as () => Chartype })
-
-const requireUrl = (name: string) => new URL(`../../../../../assets/images/${name}`, import.meta.url).href
-
-const imageSrc = ref('')
-let currentBlobUrl: string | null = null
-
-const needsAuth = (url: string) => !(!url || url.startsWith('data:') || url.startsWith('blob:') || url.startsWith('http://') || url.startsWith('https://')) && url.includes('/api/file/')
-
-const loadAuthImage = async (url: string) => {
-  if (currentBlobUrl) { URL.revokeObjectURL(currentBlobUrl); currentBlobUrl = null }
-  if (!url) { imageSrc.value = requireUrl('project/moke-20211219181327.png'); return }
-  if (!needsAuth(url)) { imageSrc.value = url; return }
-  try {
-    const token = getLocalStorage(StorageEnum.GO_ACCESS_TOKEN_STORE)
-    const res = await fetch(url, { headers: { Authorization: token ? `Bearer ${token}` : '' } })
-    if (res.ok) { const blob = await res.blob(); currentBlobUrl = URL.createObjectURL(blob); imageSrc.value = currentBlobUrl }
-    else { imageSrc.value = requireUrl('project/moke-20211219181327.png') }
-  } catch { imageSrc.value = requireUrl('project/moke-20211219181327.png') }
-}
-
-watch(() => props.cardData?.indexImg, (n) => loadAuthImage(n), { immediate: true })
-onUnmounted(() => { if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl) })
 
 const selectOptions = ref([
   { label: renderLang('global.r_preview'), key: 'preview', icon: renderIcon(BrowsersOutlineIcon) },

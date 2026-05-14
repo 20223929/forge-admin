@@ -1,13 +1,9 @@
 <template>
   <div :style="getStyle(borderRadius)">
-    <n-image
-      :object-fit="fit"
-      preview-disabled
+    <fg-auth-image
       :src="option.dataset"
-      :fallback-src="requireErrorImg()"
-      :width="w"
-      :height="h"
-      lazy
+      :fallback="requireErrorImg()"
+      :img-style="{ width: `${w}px`, height: `${h}px`, objectFit: fit }"
     />
   </div>
 </template>
@@ -18,6 +14,7 @@ import { requireErrorImg } from '@/utils'
 import { useChartDataFetch } from '@/hooks'
 import { CreateComponentType } from '@/packages/index.d'
 import { useChartEditStore } from '@/store/modules/chartEditStore/chartEditStore'
+import FgAuthImage from '@/components/FgAuthImage/index.vue'
 
 const props = defineProps({
   chartConfig: {

@@ -5,5 +5,8 @@ export { ConfigType }
 export { PackagesType }
 export interface PackagesStoreType {
   packagesList: PackagesType,
-  newPhoto?: ConfigType
+  newPhoto?: ConfigType,
+  materialUploadVisible: boolean,
+  materialUploadCategory: string,
+  materialPhotosVersion: number
 }

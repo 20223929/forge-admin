@@ -27,7 +27,7 @@
 import api from '@/api'
 import { defaultThemeConfig } from '@/config/theme.config.js'
 import { useAuthStore, useUserStore } from '@/store'
-import { getFileUrl } from '@/utils/file'
+import { resolveRenderableFileUrl } from '@/utils/file'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -46,17 +46,7 @@ async function loadAvatar() {
     return
   }
   try {
-    const url = getFileUrl(avatar)
-    const response = await fetch(url, {
-      headers: { Authorization: `Bearer ${authStore.accessToken}` },
-    })
-    if (response.ok) {
-      const blob = await response.blob()
-      avatarSrc.value = URL.createObjectURL(blob)
-    }
-    else {
-      avatarSrc.value = ''
-    }
+    avatarSrc.value = await resolveRenderableFileUrl(avatar)
   }
   catch {
     avatarSrc.value = ''

@@ -27,10 +27,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { PreviewRenderList } from './components/PreviewRenderList'
 import { getFilterStyle, setTitle } from '@/utils'
-import { getEditCanvasConfigStyle, getSessionStorageInfo, keyRecordHandle, dragCanvas } from './utils'
+import { getSessionStorageInfo, keyRecordHandle, dragCanvas } from './utils'
 import { useComInstall } from './hooks/useComInstall.hook'
 import { useScale } from './hooks/useScale.hook'
 import { useStore } from './hooks/useStore.hook'
@@ -38,21 +38,40 @@ import { PreviewScaleEnum } from '@/enums/styleEnum'
 import type { ChartEditStorageType } from './index.d'
 import { useChartEditStore } from '@/store/modules/chartEditStore/chartEditStore'
 import { useInitVChartsTheme } from '@/hooks'
+import { resolveAssetSourceUrl } from '@/utils'
 
 // const localStorageInfo: ChartEditStorageType = getSessionStorageInfo() as ChartEditStorageType
 
 await getSessionStorageInfo()
 const chartEditStore = useChartEditStore() as unknown as ChartEditStorageType
+const resolvedBackgroundImage = ref('')
 
 setTitle(`预览-${chartEditStore.editCanvasConfig.projectName}`)
 
 const previewRefStyle = computed(() => {
+  const canvas = chartEditStore.editCanvasConfig
+  const computedBackground = canvas.selectColor
+    ? { background: canvas.background }
+    : resolvedBackgroundImage.value
+      ? { background: `url(${resolvedBackgroundImage.value}) center center / cover no-repeat !important` }
+      : {}
   return {
     overflow: 'hidden',
-    ...getEditCanvasConfigStyle(chartEditStore.editCanvasConfig),
+    position: 'relative',
+    width: canvas.width ? `${canvas.width || 100}px` : '100%',
+    height: canvas.height ? `${canvas.height}px` : '100%',
+    ...computedBackground,
     ...getFilterStyle(chartEditStore.editCanvasConfig)
   }
 })
+
+watch(
+  () => chartEditStore.editCanvasConfig.backgroundImage,
+  async (newValue) => {
+    resolvedBackgroundImage.value = newValue ? await resolveAssetSourceUrl(newValue) : ''
+  },
+  { immediate: true }
+)
 
 const showEntity = computed(() => {
   const type = chartEditStore.editCanvasConfig.previewScaleType

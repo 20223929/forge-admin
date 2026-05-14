@@ -1,8 +1,17 @@
 <template>
   <collapse-item name="路径" :expanded="true">
+      <setting-item>
+        <material-asset-selector
+          :value="optionData.dataset"
+          mode="multiple"
+          button-text="从素材库追加图片"
+          @confirm="appendMaterialAssets"
+          @clear="clearMaterialAssets"
+        />
+      </setting-item>
       <setting-item v-for="(item, index) in optionData.dataset" :key="index">
         <n-input-group>
-          <n-input v-model:value="optionData.dataset[index]" size="small" placeholder="请输入图片地址"></n-input>
+          <n-input v-model:value="optionData.dataset[index]" size="small" placeholder="请输入图片地址或素材引用"></n-input>
           <n-button ghost @click="optionData.dataset.splice(index, 1)"> - </n-button>
         </n-input-group>
       </setting-item>
@@ -75,6 +84,7 @@
 <script setup lang="ts">
 import { PropType } from 'vue'
 import { option } from './config'
+import MaterialAssetSelector from '@/components/Pages/MaterialAssetSelector/index.vue'
 import { CollapseItem, SettingItemBox, SettingItem } from '@/components/Pages/ChartItemSetting'
 
 const props = defineProps({
@@ -83,6 +93,22 @@ const props = defineProps({
     required: true
   }
 })
+
+const appendMaterialAssets = (values: string[]) => {
+  if (!Array.isArray(values) || !values.length) {
+    return
+  }
+  const existing = new Set(props.optionData.dataset)
+  values.forEach((value) => {
+    if (!existing.has(value)) {
+      props.optionData.dataset.push(value)
+    }
+  })
+}
+
+const clearMaterialAssets = () => {
+  props.optionData.dataset = []
+}
 
 // 字典
 const dotTypes = [
