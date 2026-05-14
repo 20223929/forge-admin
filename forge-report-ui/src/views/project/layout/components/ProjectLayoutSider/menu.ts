@@ -5,7 +5,7 @@ import { PageEnum } from '@/enums/pageEnum'
 import { MenuOption, MenuGroupOption } from 'naive-ui'
 import { icon } from '@/plugins'
 
-const { TvOutlineIcon, SparklesIcon } = icon.ionicons5
+const { TvOutlineIcon, FolderOpenIcon } = icon.ionicons5
 const { StoreIcon, ObjectStorageIcon, DevicesIcon } = icon.carbon
 export const renderMenuLabel = (option: MenuOption | MenuGroupOption) => {
   return option.label
@@ -51,13 +51,13 @@ export const menuOptionsInit = () => {
                   RouterLink,
                   {
                     to: {
-                      name: PageEnum.BASE_HOME_TEMPLATE_NAME,
+                      name: PageEnum.BASE_HOME_DIRECTORY_NAME,
                     },
                   },
-                  { default: () => t('project.my_template') }
+                  { default: () => t('project.directory_manage') }
                 ),
-              key: PageEnum.BASE_HOME_TEMPLATE_NAME,
-              icon: renderIcon(ObjectStorageIcon),
+              key: PageEnum.BASE_HOME_DIRECTORY_NAME,
+              icon: renderIcon(FolderOpenIcon),
             },
             {
               label: () =>
@@ -65,13 +65,13 @@ export const menuOptionsInit = () => {
                   RouterLink,
                   {
                     to: {
-                      name: PageEnum.BASE_HOME_AI_PROVIDER_NAME,
+                      name: PageEnum.BASE_HOME_TEMPLATE_NAME,
                     },
                   },
-                  { default: () => 'AI 供应商' }
+                  { default: () => t('project.my_template') }
                 ),
-              key: PageEnum.BASE_HOME_AI_PROVIDER_NAME,
-              icon: renderIcon(SparklesIcon),
+              key: PageEnum.BASE_HOME_TEMPLATE_NAME,
+              icon: renderIcon(ObjectStorageIcon),
             },
           ],
         },

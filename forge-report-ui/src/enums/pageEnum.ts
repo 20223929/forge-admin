@@ -22,6 +22,8 @@ export enum PageEnum {
   // 登录
   BASE_LOGIN = '/login',
   BASE_LOGIN_NAME = 'Login',
+  BASE_SSO_LOGIN = '/sso-login',
+  BASE_SSO_LOGIN_NAME = 'SsoLogin',
 
   //重定向
   REDIRECT = '/redirect',
@@ -38,6 +40,10 @@ export enum PageEnum {
   BASE_HOME_ITEMS = '/project/items',
   BASE_HOME_ITEMS_NAME = 'Project-Items',
 
+  // 目录管理
+  BASE_HOME_DIRECTORY = '/project/directories',
+  BASE_HOME_DIRECTORY_NAME = 'Project-Directories',
+
   // 我的模板
   BASE_HOME_TEMPLATE = '/project/my-template',
   BASE_HOME_TEMPLATE_NAME = 'Project-My-Template',
@@ -45,10 +51,6 @@ export enum PageEnum {
   // 模板市场
   BASE_HOME_TEMPLATE_MARKET = '/project/template-market',
   BASE_HOME_TEMPLATE_MARKET_NAME = 'Project-Template-Market',
-
-  // AI 供应商配置
-  BASE_HOME_AI_PROVIDER = '/project/ai-provider',
-  BASE_HOME_AI_PROVIDER_NAME = 'Project-AI-Provider',
 
   // 错误
   ERROR_PAGE_NAME_403 = 'ErrorPage403',

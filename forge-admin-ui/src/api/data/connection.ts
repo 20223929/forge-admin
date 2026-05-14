@@ -87,5 +87,5 @@ export function getDataConnectionTables(id: number, keyword?: string) {
 }
 
 export function getDataConnectionFields(id: number, tableName: string) {
-  return request.get(`/data/connection/${id}/tables/${tableName}/fields`)
+  return request.get(`/data/connection/${id}/tables/${encodeURIComponent(tableName)}/fields`)
 }
