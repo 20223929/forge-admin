@@ -72,6 +72,15 @@ public class SysFileMetadataController {
     }
     
     /**
+     * 根据 fileId 删除（带所有权校验）
+     */
+    @DeleteMapping("/delete/{fileId}")
+    public RespInfo<Void> deleteByFileId(@PathVariable String fileId) {
+        fileMetadataService.removeByFileId(fileId);
+        return RespInfo.success();
+    }
+
+    /**
      * 批量删除
      */
     @DeleteMapping("/{fileIds}")

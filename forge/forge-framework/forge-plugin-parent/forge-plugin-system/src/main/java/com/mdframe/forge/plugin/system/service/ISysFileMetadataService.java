@@ -28,6 +28,11 @@ public interface ISysFileMetadataService extends IService<SysFileMetadata> {
     SysFileMetadata getByFileId(String fileId);
 
     /**
+     * 根据 fileId 字符串删除（带所有权校验）
+     */
+    void removeByFileId(String fileId);
+
+    /**
      * 批量删除
      */
     void removeBatch(String[] fileIds);

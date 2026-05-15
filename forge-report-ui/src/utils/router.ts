@@ -6,6 +6,7 @@ import { StorageEnum } from '@/enums/storageEnum'
 import { clearLocalStorage, getLocalStorage } from './storage'
 import router from '@/router'
 import { logoutApi } from '@/api/auth'
+import { useUserStore } from '@/store/modules/userStore/userStore'
 
 /**
  * * 根据名字跳转路由
@@ -109,6 +110,7 @@ export const logout = async () => {
   } catch (e) {
     // 忽略退出接口错误
   }
+  useUserStore().reset()
   clearLocalStorage(StorageEnum.GO_ACCESS_TOKEN_STORE)
   routerTurnByName(PageEnum.BASE_LOGIN_NAME)
 }

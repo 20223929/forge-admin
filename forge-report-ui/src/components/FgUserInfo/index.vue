@@ -25,12 +25,13 @@
 </template>
 
 <script lang="ts" setup>
-import { h, ref } from 'vue'
+import { h, ref, computed } from 'vue'
 import { NAvatar, NText } from 'naive-ui'
 import { renderIcon } from '@/utils'
 import { logout, renderLang, goDialog } from '@/utils'
 import { FgSystemSet } from '@/components/FgSystemSet/index'
 import { FgSystemInfo } from '@/components/FgSystemInfo/index'
+import { useUserStore } from '@/store/modules/userStore/userStore'
 import Person from './person.png'
 
 import { icon } from '@/plugins'
@@ -41,15 +42,16 @@ const {
   SettingsSharpIcon
 } = icon.ionicons5
 
+const userStore = useUserStore()
 const t = window['$t']
 
 const modelShowInfo = ref(false)
 const modelShow = ref(false)
 
-// 是否失败
 const fallback = ref(false)
 
-// 用户图标渲染
+const displayName = computed(() => userStore.realName || userStore.username || '管理员')
+
 const renderUserInfo = () => {
   return h(
     'div',
@@ -64,7 +66,7 @@ const renderUserInfo = () => {
       }),
       h('div', null, [
         h('div', null, [
-          h(NText, { depth: 2 }, { default: () => '管理员' })
+          h(NText, { depth: 2 }, { default: () => displayName.value })
         ])
       ])
     ]

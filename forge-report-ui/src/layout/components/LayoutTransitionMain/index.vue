@@ -1,14 +1,16 @@
 <template>
   <router-view #default="{ Component, route }">
-    <transition name="fade" mode="out-in" appear>
+    <keep-alive>
       <component
-        v-if="route.meta.noKeepAlive"
+        v-if="!route.meta.noKeepAlive"
         :is="Component"
         :key="route.fullPath"
-      ></component>
-      <keep-alive v-else>
-        <component :is="Component" :key="route.fullPath"></component>
-      </keep-alive>
-    </transition>
+      />
+    </keep-alive>
+    <component
+      v-if="route.meta.noKeepAlive"
+      :is="Component"
+      :key="route.fullPath"
+    />
   </router-view>
 </template>

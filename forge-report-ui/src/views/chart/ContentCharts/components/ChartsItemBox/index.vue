@@ -26,9 +26,13 @@
             <n-ellipsis>{{ item.title }}</n-ellipsis>
           </n-text>
           <div class="asset-hint-row">
+            <n-tag v-if="(item as any).isPrivate !== undefined" size="tiny" :bordered="false" :type="(item as any).isPrivate ? 'warning' : 'success'">
+              {{ (item as any).isPrivate ? '私有' : '公共' }}
+            </n-tag>
             <span class="asset-hint">{{ item.disabled ? '上传到素材库' : '拖拽 / 双击' }}</span>
             <span
               v-if="item.configEvents?.renameHandle"
+              v-permission="'report:user:editName'"
               class="rename-trigger"
               @click.stop="openRenameModal(item)"
               title="重命名"
@@ -304,6 +308,13 @@ $halfCenterHeight: 74px;
         display: flex;
         align-items: center;
         gap: 4px;
+        min-width: 0;
+
+        :deep(.n-tag) {
+          font-size: 10px;
+          line-height: 14px;
+          height: 16px;
+        }
 
         .asset-hint {
           font-size: 10px;
@@ -400,7 +411,10 @@ $halfCenterHeight: 74px;
       }
 
       .asset-hint-row {
-        display: block;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px;
         margin-top: 2px;
       }
     }

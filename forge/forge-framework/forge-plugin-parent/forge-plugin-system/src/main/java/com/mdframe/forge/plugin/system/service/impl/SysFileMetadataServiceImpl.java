@@ -1,5 +1,6 @@
 package com.mdframe.forge.plugin.system.service.impl;
 
+import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -59,7 +60,18 @@ public class SysFileMetadataServiceImpl extends ServiceImpl<SysFileMetadataMappe
         if (StrUtil.isNotBlank(condition.getMimeType())) {
             wrapper.likeRight(SysFileMetadata::getMimeType, condition.getMimeType());
         }
-        
+
+        if (condition.getIsPrivate() != null) {
+            wrapper.eq(SysFileMetadata::getIsPrivate, condition.getIsPrivate());
+        }
+
+        if (!StpUtil.hasPermission("*:*:*")) {
+            Long currentUserId = StpUtil.getLoginIdAsLong();
+            wrapper.and(w -> w.eq(SysFileMetadata::getIsPrivate, false)
+                             .or()
+                             .eq(SysFileMetadata::getUploaderId, currentUserId));
+        }
+
         wrapper.eq(SysFileMetadata::getStatus, "1");
         
         wrapper.orderByDesc(SysFileMetadata::getUploadTime);
@@ -86,6 +98,29 @@ public class SysFileMetadataServiceImpl extends ServiceImpl<SysFileMetadataMappe
                 .one();
     }
 
+    private void checkOwnership(SysFileMetadata metadata) {
+        if (metadata == null) return;
+        if (StpUtil.hasPermission("*:*:*")) return;
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        if (metadata.getUploaderId() != null && !currentUserId.equals(metadata.getUploaderId())) {
+            throw new RuntimeException("无权操作他人素材");
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void removeByFileId(String fileId) {
+        SysFileMetadata metadata = this.lambdaQuery()
+                .eq(SysFileMetadata::getFileId, fileId)
+                .eq(SysFileMetadata::getStatus, 1)
+                .one();
+        if (metadata == null) {
+            throw new RuntimeException("素材不存在");
+        }
+        checkOwnership(metadata);
+        fileManager.delete(metadata.getFileId());
+    }
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void removeBatch(String[] fileIds) {
@@ -101,6 +136,11 @@ public class SysFileMetadataServiceImpl extends ServiceImpl<SysFileMetadataMappe
 
     @Override
     public void rename(String fileId, String originalName) {
+        SysFileMetadata existing = this.lambdaQuery()
+                .eq(SysFileMetadata::getFileId, fileId)
+                .eq(SysFileMetadata::getStatus, 1)
+                .one();
+        checkOwnership(existing);
         this.lambdaUpdate()
                 .eq(SysFileMetadata::getFileId, fileId)
                 .set(SysFileMetadata::getOriginalName, originalName)

@@ -46,11 +46,12 @@ export const mapMaterialAssetToPhotoConfig = (asset: MaterialAsset): ConfigType 
     image: fileRef,
     dataset: fileRef,
     redirectComponent: `${ImageConfig.package}/${ImageConfig.category}/${ImageConfig.key}`,
+    isPrivate: asset.isPrivate,
     configEvents: {
       renameHandle: async (newName: string) => {
         await renameMaterialAssetApi(asset.fileId, newName)
         return newName
       }
     }
-  }
+  } as any
 }

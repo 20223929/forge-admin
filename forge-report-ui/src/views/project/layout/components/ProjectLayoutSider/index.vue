@@ -32,13 +32,13 @@
               :key="item.key"
               :to="item.to"
               class="nav-item"
-              :class="{ active: routeName === item.key, collapsed }"
+              :class="{ active: currentPath === item.path, collapsed }"
               :title="collapsed ? item.text : ''"
             >
               <span v-show="!collapsed" class="nav-bullet"></span>
-              <n-icon size="18" class="nav-icon"><component :is="item.icon"></component></n-icon>
+              <FgIconify class="nav-icon" :icon="item.icon" width="18" color="currentColor" />
               <span v-show="!collapsed" class="nav-text">{{ item.text }}</span>
-              <span v-show="!collapsed && routeName === item.key" class="nav-active-bar"></span>
+              <span v-show="!collapsed && currentPath === item.path" class="nav-active-bar"></span>
             </router-link>
           </div>
         </div>
@@ -96,46 +96,54 @@ import { asideWidth } from '@/settings/designSetting'
 import { useSettingStore } from '@/store/modules/settingStore/settingStore'
 import { useDesignStore } from '@/store/modules/designStore/designStore'
 import { useLangStore } from '@/store/modules/langStore/langStore'
+import { useUserStore } from '@/store/modules/userStore/userStore'
 import { ThemeColorSelect } from '@/components/Pages/ThemeColorSelect'
 import { FgUserInfo } from '@/components/FgUserInfo'
+import { FgIconify } from '@/components/FgIconify'
 import { setHtmlTheme } from '@/utils'
-import { PageEnum } from '@/enums/pageEnum'
 import { LangEnum } from '@/enums/styleEnum'
 import { langList } from '@/i18n/index'
 import { icon } from '@/plugins'
+import type { MenuItem } from '@/store/modules/userStore/userStore.d'
 
-const { MoonIcon, SunnyIcon, LanguageIcon, TvOutlineIcon, SparklesIcon, ImagesIcon,FolderOpenIcon } = icon.ionicons5
-const { StoreIcon, ObjectStorageIcon } = icon.carbon
+const { MoonIcon, SunnyIcon, LanguageIcon } = icon.ionicons5
 
 const { locale } = useI18n()
 const route = useRoute()
 const designStore = useDesignStore()
 const langStore = useLangStore()
+const userStore = useUserStore()
 const { getAsideCollapsedWidth } = toRefs(useSettingStore())
 const collapsed = ref<boolean>(false)
 const t = window['$t']
-const routeName = computed(() => route.name)
+const currentPath = computed(() => route.path)
 
-const navSections = computed(() => [
-  {
-    key: 'main',
-    label: t('project.my'),
-    children: [
-      { key: PageEnum.BASE_HOME_ITEMS_NAME, icon: TvOutlineIcon, text: t('project.all_project'), to: { name: PageEnum.BASE_HOME_ITEMS_NAME } },
-      { key: PageEnum.BASE_HOME_TEMPLATE_NAME, icon: ObjectStorageIcon, text: t('project.my_template'), to: { name: PageEnum.BASE_HOME_TEMPLATE_NAME } },
-      { key: PageEnum.BASE_HOME_MATERIALS_NAME, icon: ImagesIcon, text: '素材库', to: { name: PageEnum.BASE_HOME_MATERIALS_NAME } },
-      { key: PageEnum.BASE_HOME_AI_PROVIDER_NAME, icon: SparklesIcon, text: 'AI 供应商', to: { name: PageEnum.BASE_HOME_AI_PROVIDER_NAME } },
-      { key: PageEnum.BASE_HOME_DIRECTORY_NAME, icon: FolderOpenIcon, text: t('project.directory_manage'), to: { name: PageEnum.BASE_HOME_DIRECTORY_NAME } },
-    ]
-  },
-  {
-    key: 'market',
-    label: t('project.template_market'),
-    children: [
-      { key: PageEnum.BASE_HOME_TEMPLATE_MARKET_NAME, icon: StoreIcon, text: t('project.template_market'), to: { name: PageEnum.BASE_HOME_TEMPLATE_MARKET_NAME } }
-    ]
+function isReportMenu(item: MenuItem): boolean {
+  if (item.clientCode && item.clientCode !== 'forge_report') return false
+  return item.resourceType === 1 || item.resourceType === 2
+}
+
+function buildSection(section: MenuItem) {
+  const children = (section.children || [])
+    .filter((child: MenuItem) => child.resourceType === 2)
+    .map((child: MenuItem) => ({
+      key: child.id,
+      icon: child.icon || 'ion:ellipse-outline',
+      text: child.resourceName,
+      path: child.path || '',
+      to: child.path || '/'
+    }))
+  return {
+    key: `section-${section.id}`,
+    label: section.resourceName,
+    children
   }
-])
+}
+
+const navSections = computed(() => {
+  const menus = userStore.menus || []
+  return menus.filter((m: MenuItem) => m.resourceType === 1 && isReportMenu(m)).map(buildSection)
+})
 
 const langOptions = langList.map((item: any) => ({ label: item.label, key: item.key }))
 

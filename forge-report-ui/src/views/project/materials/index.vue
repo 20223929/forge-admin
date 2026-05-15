@@ -49,6 +49,15 @@
             />
           </div>
 
+          <div class="upload-category">
+            <span>可见范围</span>
+            <n-select
+              v-model:value="uploadVisibility"
+              :options="visibilityOptions"
+              size="small"
+            />
+          </div>
+
           <n-upload
             multiple
             accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
@@ -113,6 +122,18 @@
                 {{ item.label }}
               </n-radio-button>
             </n-radio-group>
+            <span class="toolbar-sep"></span>
+            <div class="visibility-chips">
+              <button
+                v-for="opt in visibilityChips"
+                :key="String(opt.value)"
+                class="visibility-chip"
+                :class="{ active: activeVisibility === opt.value }"
+                @click="activeVisibility = opt.value; handleVisibilityChange()"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
           </div>
           <div class="toolbar-info">
             <span class="toolbar-count">
@@ -150,6 +171,9 @@
                   <n-tag size="small" :bordered="false" type="info">
                     {{ getCategoryLabel(item.businessId) }}
                   </n-tag>
+                  <n-tag size="small" :bordered="false" :type="item.isPrivate ? 'warning' : 'success'">
+                    {{ item.isPrivate ? '私有' : '公共' }}
+                  </n-tag>
                   <span class="material-size">{{ formatFileSize(item.fileSize) }}</span>
                 </div>
 
@@ -172,6 +196,7 @@
                   <template v-else>
                     {{ item.originalName }}
                     <n-icon
+                      v-permission="'report:user:editName'"
                       size="14"
                       class="rename-icon"
                       title="重命名"
@@ -190,9 +215,9 @@
                 <div class="material-actions">
                   <a href="" class="action-link" @click.prevent="openPreview(item)">预览</a>
                   <span class="action-divider">|</span>
-                  <a href="" class="action-link" @click.prevent="handleDownload(item)">下载</a>
-                  <span class="action-divider">|</span>
-                  <a href="" class="action-link danger" @click.prevent="handleDelete(item)">删除</a>
+                  <a v-permission="'report:user:down'" href="" class="action-link" @click.prevent="handleDownload(item)">下载</a>
+                  <span v-permission="'report:user:del'" class="action-divider">|</span>
+                  <a v-permission="'report:user:del'" href="" class="action-link danger" @click.prevent="handleDelete(item)">删除</a>
                 </div>
               </div>
             </article>
@@ -241,8 +266,23 @@ import {
 import type { MaterialAsset, ReportMaterialCategory } from '@/api/file'
 import { StorageEnum } from '@/enums/storageEnum'
 import { getLocalStorage } from '@/utils/storage'
+import { useUserStore } from '@/store/modules/userStore/userStore'
 
 const { ImagesIcon } = icon.ionicons5
+
+const userStore = useUserStore()
+const isAdmin = computed(() => userStore.permissions.includes('*:*:*'))
+
+const visibilityChips = computed(() => [
+  { label: '全部', value: undefined },
+  { label: '私有', value: true },
+  { label: '公共', value: false }
+])
+
+const visibilityOptions = computed(() => [
+  { label: '私有', value: true },
+  { label: '公共', value: false, disabled: !isAdmin.value }
+])
 
 const materialCategoryOptions = reportMaterialCategoryOptions
 const uploadCategoryOptions = materialCategoryOptions.filter(item => item.value !== 'all')
@@ -251,7 +291,9 @@ const loading = ref(false)
 const uploading = ref(false)
 const keyword = ref('')
 const activeCategory = ref<ReportMaterialCategory>('all')
+const activeVisibility = ref<boolean | undefined>(undefined)
 const uploadCategory = ref<Exclude<ReportMaterialCategory, 'all'>>('background')
+const uploadVisibility = ref(true)
 const materials = ref<MaterialAsset[]>([])
 const previewVisible = ref(false)
 const previewTarget = ref<MaterialAsset | null>(null)
@@ -308,7 +350,8 @@ const fetchMaterials = async () => {
       pageNum: pagination.value.pageNum,
       pageSize: pagination.value.pageSize,
       originalName: keyword.value.trim() || undefined,
-      businessId: activeCategory.value === 'all' ? undefined : activeCategory.value
+      businessId: activeCategory.value === 'all' ? undefined : activeCategory.value,
+      isPrivate: activeVisibility.value
     })
     materials.value = res.data?.records || []
     pagination.value.total = Number(res.data?.total || 0)
@@ -354,6 +397,11 @@ const handleCategoryChange = async () => {
   await fetchMaterials()
 }
 
+const handleVisibilityChange = async () => {
+  pagination.value.pageNum = 1
+  await fetchMaterials()
+}
+
 const handlePageChange = async (page: number) => {
   pagination.value.pageNum = page
   await fetchMaterials()
@@ -384,7 +432,7 @@ const handleUploadRequest = async (options: UploadCustomRequestOptions) => {
 
   uploading.value = true
   try {
-    const res = await uploadFileApi(rawFile as File, REPORT_MATERIAL_BUSINESS_TYPE, uploadCategory.value)
+    const res = await uploadFileApi(rawFile as File, REPORT_MATERIAL_BUSINESS_TYPE, uploadCategory.value, uploadVisibility.value)
     if (res.code === 200) {
       options.onFinish?.()
       window['$message']?.success('素材上传成功')
@@ -723,6 +771,32 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
+.visibility-chips {
+  display: flex;
+  gap: 4px;
+}
+
+.visibility-chip {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 999px;
+  font-size: 12px;
+  color: rgba(203, 213, 225, 0.76);
+  background: rgba(15, 23, 42, 0.5);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  &:hover {
+    color: #fff;
+    border-color: rgba(var(--app-theme-rgb), 0.3);
+  }
+  &.active {
+    color: #fff;
+    border-color: rgba(var(--app-theme-rgb), 0.4);
+    background: linear-gradient(135deg, rgba(var(--app-theme-rgb), 0.2), rgba(var(--app-theme-rgb), 0.06));
+  }
+}
+
 /* 分类 radio 换行不溢出 */
 .toolbar-filters :deep(.n-radio-group) {
   flex-wrap: wrap;
@@ -783,7 +857,17 @@ onMounted(async () => {
   padding: 12px 12px 14px;
 }
 
-.material-row,
+.material-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+
+  .material-size {
+    margin-left: auto;
+  }
+}
+
 .material-meta,
 .material-actions {
   display: flex;

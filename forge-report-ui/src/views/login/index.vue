@@ -161,6 +161,7 @@ import { icon } from '@/plugins'
 import { StorageEnum } from '@/enums/storageEnum'
 import { routerTurnByName, setLocalStorage } from '@/utils'
 import { loginApi } from '@/api/auth'
+import { loadUserData } from '@/utils/auth'
 
 const { GO_ACCESS_TOKEN_STORE } = StorageEnum
 
@@ -219,6 +220,7 @@ const handleSubmit = (e: Event) => {
         const res = await loginApi({ username, password })
         if (res && res.code === 200 && res.data?.accessToken) {
           setLocalStorage(GO_ACCESS_TOKEN_STORE, res.data.accessToken)
+          await loadUserData()
           window['$message'].success(`${t('login.login_success')}!`)
           routerTurnByName(PageEnum.BASE_HOME_NAME, true)
         } else {

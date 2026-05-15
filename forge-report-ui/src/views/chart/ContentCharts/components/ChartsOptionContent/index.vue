@@ -55,6 +55,11 @@
           :options="materialCategoryUploadOptions"
           placeholder="选择素材分类"
         />
+        <n-select
+          v-model:value="materialUploadVisibility"
+          :options="visibilityOptions"
+          placeholder="可见范围"
+        />
         <n-upload
           accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
           :show-file-list="false"
@@ -80,15 +85,24 @@ import { loadAsyncComponent } from '@/utils'
 import { usePackagesStore } from '@/store/modules/packagesStore/packagesStore'
 import { icon } from '@/plugins'
 import { REPORT_MATERIAL_BUSINESS_TYPE, reportMaterialCategoryOptions, uploadFileApi } from '@/api/file'
+import { useUserStore } from '@/store/modules/userStore/userStore'
 import type { UploadCustomRequestOptions } from 'naive-ui'
 
 const { ChevronDownIcon } = icon.ionicons5
 
 const ChartsItemBox = loadAsyncComponent(() => import('../ChartsItemBox/index.vue'))
 const packagesStore = usePackagesStore()
+const userStore = useUserStore()
 const materialUploading = ref(false)
 const materialUploadCategory = ref('background')
+const materialUploadVisibility = ref(true)
 const materialCategoryUploadOptions = reportMaterialCategoryOptions.filter(item => item.value !== 'all')
+
+const isAdmin = computed(() => userStore.permissions.includes('*:*:*'))
+const visibilityOptions = computed(() => [
+  { label: '私有', value: true },
+  { label: '公共', value: false, disabled: !isAdmin.value }
+])
 
 const props = defineProps({
   selectOptions: {
@@ -198,7 +212,7 @@ const handleMaterialUpload = async (options: UploadCustomRequestOptions) => {
   }
   materialUploading.value = true
   try {
-    const res = await uploadFileApi(rawFile as File, REPORT_MATERIAL_BUSINESS_TYPE, materialUploadCategory.value)
+    const res = await uploadFileApi(rawFile as File, REPORT_MATERIAL_BUSINESS_TYPE, materialUploadCategory.value, materialUploadVisibility.value)
     if (res.code === 200) {
       options.onFinish?.()
       packagesStore.closeMaterialUploadDialog()

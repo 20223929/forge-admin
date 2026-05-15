@@ -1,5 +1,6 @@
 package com.mdframe.forge.starter.file.controller;
 
+import cn.dev33.satoken.stp.StpUtil;
 import com.mdframe.forge.starter.core.annotation.api.ApiPermissionIgnore;
 import com.mdframe.forge.starter.core.domain.RespInfo;
 import com.mdframe.forge.starter.file.core.FileManager;
@@ -35,12 +36,15 @@ public class FileController {
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "businessType", required = false, defaultValue = "common") String businessType,
             @RequestParam(value = "businessId", required = false) String businessId,
-            @RequestParam(value = "storageType", required = false) String storageType) {
-        
-        FileMetadata metadata = storageType != null
-            ? fileManager.upload(file, businessType, businessId, storageType)
-            : fileManager.upload(file, businessType, businessId);
-        
+            @RequestParam(value = "storageType", required = false) String storageType,
+            @RequestParam(value = "isPrivate", required = false, defaultValue = "true") Boolean isPrivate) {
+
+        if (!isPrivate && !StpUtil.hasPermission("*:*:*")) {
+            return RespInfo.error("只有管理员才能上传公共素材");
+        }
+
+        FileMetadata metadata = fileManager.upload(file, businessType, businessId, storageType, isPrivate);
+
         return RespInfo.success(metadata);
     }
     

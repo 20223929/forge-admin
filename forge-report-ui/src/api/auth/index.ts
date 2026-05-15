@@ -1,4 +1,4 @@
-import { post } from '@/api/http'
+import { get, post } from '@/api/http'
 import { encryptPassword } from '@/utils/rsa'
 
 export interface LoginRequest {
@@ -30,7 +30,6 @@ export interface SsoExchangeRequest {
  * 用户登录（密码使用 RSA 加密）
  */
 export const loginApi = async (data: LoginRequest): Promise<LoginResponse> => {
-  // RSA 加密密码
   const encryptedPwd = await encryptPassword(data.password)
 
   return post('/forge-report-api/auth/login', {
@@ -56,4 +55,25 @@ export const logoutApi = (): Promise<any> => {
  */
 export const ssoExchangeApi = (data: SsoExchangeRequest): Promise<LoginResponse> => {
   return post('/forge-report-api/auth/sso/exchange', data) as unknown as Promise<LoginResponse>
+}
+
+/**
+ * 获取当前用户信息
+ */
+export const getUserInfoApi = () => {
+  return get('/forge-report-api/auth/userInfo') as unknown as Promise<{ code: number; data: any; msg: string }>
+}
+
+/**
+ * 获取当前用户菜单树
+ */
+export const getUserMenuApi = () => {
+  return get('/forge-report-api/auth/current/menu') as unknown as Promise<{ code: number; data: any; msg: string }>
+}
+
+/**
+ * 获取当前用户权限标识列表
+ */
+export const getUserPermissionsApi = () => {
+  return get('/forge-report-api/auth/current/permissions') as unknown as Promise<{ code: number; data: string[]; msg: string }>
 }

@@ -14,13 +14,14 @@ export interface FileUploadResult {
   createTime?: string
 }
 
-export const uploadFileApi = async (file: File, businessType = 'project_screenshot', businessId?: string) => {
+export const uploadFileApi = async (file: File, businessType = 'project_screenshot', businessId?: string, isPrivate = true) => {
   const formData = new FormData()
   formData.append('file', file)
   formData.append('businessType', businessType)
   if (businessId) {
     formData.append('businessId', businessId)
   }
+  formData.append('isPrivate', String(isPrivate))
 
   const config: AxiosRequestConfig & { encrypt?: boolean } = {
     url: '/forge-report-api/api/file/upload',
@@ -50,6 +51,7 @@ export interface MaterialAsset {
   storageType?: string
   businessType?: string
   businessId?: string
+  isPrivate?: boolean
   accessUrl?: string
   uploadTime?: string
   downloadCount?: number
@@ -79,6 +81,7 @@ export const getMaterialAssetPageApi = (params?: {
   pageSize?: number
   originalName?: string
   businessId?: string
+  isPrivate?: boolean
 }) => {
   return get('/forge-report-api/system/file/metadata/page', {
     pageNum: params?.pageNum ?? 1,
@@ -86,12 +89,13 @@ export const getMaterialAssetPageApi = (params?: {
     businessType: REPORT_MATERIAL_BUSINESS_TYPE,
     businessId: params?.businessId,
     originalName: params?.originalName,
+    isPrivate: params?.isPrivate,
     mimeType: 'image/'
   }) as unknown as Promise<{ code: number; data: MaterialAssetPageResponse; msg: string }>
 }
 
 export const deleteMaterialAssetApi = (fileId: string) => {
-  return del(`/forge-report-api/api/file/${fileId}`) as unknown as Promise<{ code: number; data?: boolean; msg: string }>
+  return del(`/forge-report-api/system/file/metadata/delete/${fileId}`) as unknown as Promise<{ code: number; data?: boolean; msg: string }>
 }
 
 export const getMaterialAssetDownloadUrl = (fileId: string) => `/forge-report-api/api/file/download/${fileId}`

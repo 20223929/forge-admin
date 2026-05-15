@@ -54,29 +54,56 @@
           <n-select
             v-model:value="activeCategory"
             :options="categoryOptions"
-            style="width: 180px"
+            style="width: 160px"
             @update:value="handleCategoryChange"
+          />
+          <n-select
+            v-model:value="activeVisibility"
+            :options="visibilityOptions"
+            style="width: 130px"
+            @update:value="handleVisibilityChange"
           />
           <n-button type="primary" @click="fetchMaterials">搜索</n-button>
         </div>
 
         <div class="selector-upload">
-          <n-select
-            v-model:value="uploadCategory"
-            :options="uploadCategoryOptions"
-            size="small"
-            class="upload-category"
-          />
-          <n-upload
-            accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
-            :show-file-list="false"
-            :custom-request="handleUploadMaterial"
-          >
-            <n-button size="small" secondary type="primary" :loading="uploading">
-              上传素材
-            </n-button>
-          </n-upload>
+          <n-button size="tiny" secondary @click="showUploadDrawer = true">
+            上传素材
+          </n-button>
         </div>
+
+        <n-drawer
+          v-model:show="showUploadDrawer"
+          :width="340"
+          placement="right"
+        >
+          <n-drawer-content title="上传素材" closable>
+            <div class="upload-drawer-body">
+              <n-select
+                v-model:value="uploadCategory"
+                :options="uploadCategoryOptions"
+                placeholder="素材分类"
+              />
+              <n-select
+                v-model:value="uploadVisibility"
+                :options="uploadVisibilityOptions"
+                placeholder="可见范围"
+              />
+              <n-upload
+                accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                :show-file-list="false"
+                :custom-request="handleUploadMaterial"
+              >
+                <n-button type="primary" block :loading="uploading">
+                  选择图片并上传
+                </n-button>
+              </n-upload>
+              <div class="upload-drawer-tip">
+                上传后会自动出现在素材列表中
+              </div>
+            </div>
+          </n-drawer-content>
+        </n-drawer>
 
         <div v-if="mode === 'multiple' && tempSelected.length" class="selected-hint">
           已选 {{ tempSelected.length }} 张素材
@@ -98,6 +125,7 @@
               <div class="asset-body">
                 <div class="asset-top">
                   <n-tag size="small" :bordered="false" type="info">{{ getCategoryLabel(item.businessId) }}</n-tag>
+                  <n-tag size="small" :bordered="false" :type="item.isPrivate ? 'warning' : 'success'">{{ item.isPrivate ? '私有' : '公共' }}</n-tag>
                   <span class="asset-size">{{ formatFileSize(item.fileSize) }}</span>
                 </div>
                 <div class="asset-name" :title="item.originalName">{{ item.originalName }}</div>
@@ -166,11 +194,14 @@ const props = defineProps({
 const emit = defineEmits(['confirm', 'clear'])
 
 const showModal = ref(false)
+const showUploadDrawer = ref(false)
 const loading = ref(false)
 const uploading = ref(false)
 const keyword = ref('')
 const activeCategory = ref('all')
+const activeVisibility = ref<boolean | undefined>(undefined)
 const uploadCategory = ref('background')
+const uploadVisibility = ref(true)
 const materials = ref<MaterialAsset[]>([])
 const tempSelected = ref<string[]>([])
 const pagination = ref({
@@ -181,6 +212,17 @@ const pagination = ref({
 
 const categoryOptions = reportMaterialCategoryOptions
 const uploadCategoryOptions = reportMaterialCategoryOptions.filter(item => item.value !== 'all')
+
+const visibilityOptions = [
+  { label: '全部可见', value: undefined },
+  { label: '私有', value: true },
+  { label: '公共', value: false }
+]
+
+const uploadVisibilityOptions = [
+  { label: '私有', value: true },
+  { label: '公共', value: false }
+]
 
 const normalizedValue = computed(() => {
   if (Array.isArray(props.value)) {
@@ -215,7 +257,8 @@ const fetchMaterials = async () => {
       pageNum: pagination.value.pageNum,
       pageSize: pagination.value.pageSize,
       originalName: keyword.value.trim() || undefined,
-      businessId: activeCategory.value === 'all' ? undefined : activeCategory.value
+      businessId: activeCategory.value === 'all' ? undefined : activeCategory.value,
+      isPrivate: activeVisibility.value
     })
     materials.value = res.data?.records || []
     pagination.value.total = Number(res.data?.total || 0)
@@ -260,6 +303,11 @@ const handleCategoryChange = async () => {
   await fetchMaterials()
 }
 
+const handleVisibilityChange = async () => {
+  pagination.value.pageNum = 1
+  await fetchMaterials()
+}
+
 const handlePageChange = async (page: number) => {
   pagination.value.pageNum = page
   await fetchMaterials()
@@ -282,7 +330,7 @@ const handleUploadMaterial = async (options: UploadCustomRequestOptions) => {
   }
   uploading.value = true
   try {
-    const res = await uploadFileApi(rawFile as File, REPORT_MATERIAL_BUSINESS_TYPE, uploadCategory.value)
+    const res = await uploadFileApi(rawFile as File, REPORT_MATERIAL_BUSINESS_TYPE, uploadCategory.value, uploadVisibility.value)
     if (res.code !== 200 || !res.data?.fileId) {
       throw new Error(res.msg || '素材上传失败')
     }
@@ -394,7 +442,7 @@ const handleUploadMaterial = async (options: UploadCustomRequestOptions) => {
 
 .modal-toolbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 180px auto;
+  grid-template-columns: minmax(0, 1fr) 150px 130px auto;
   gap: 10px;
 }
 
@@ -406,12 +454,19 @@ const handleUploadMaterial = async (options: UploadCustomRequestOptions) => {
 .selector-upload {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 10px;
-  border: 1px solid rgba(var(--app-theme-rgb), 0.08);
-  border-radius: 10px;
-  background: rgba(var(--app-theme-rgb), 0.035);
+  padding: 6px 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.08);
+}
+
+.upload-drawer-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.upload-drawer-tip {
+  font-size: 12px;
+  color: rgba(148, 163, 184, 0.72);
 }
 
 .upload-category {
@@ -470,11 +525,12 @@ const handleUploadMaterial = async (options: UploadCustomRequestOptions) => {
 .asset-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 .asset-size {
+  margin-left: auto;
   font-size: 11px;
   color: rgba(148, 163, 184, 0.9);
 }

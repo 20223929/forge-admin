@@ -34,6 +34,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ssoExchangeApi } from '@/api/auth'
+import { loadUserData } from '@/utils/auth'
 import { PageEnum } from '@/enums/pageEnum'
 import { StorageEnum } from '@/enums/storageEnum'
 import { clearLocalStorage, setLocalStorage } from '@/utils/storage'
@@ -78,6 +79,7 @@ async function handleExchange() {
     }
 
     setLocalStorage(StorageEnum.GO_ACCESS_TOKEN_STORE, token)
+    await loadUserData()
     await router.replace(redirectPath.value)
   }
   catch (error: any) {

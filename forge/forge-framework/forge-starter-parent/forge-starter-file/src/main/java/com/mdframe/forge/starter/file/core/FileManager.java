@@ -52,26 +52,51 @@ public class FileManager {
     public FileStorage getStorage(String storageType) {
         return storageMap.get(storageType);
     }
+
+    /**
+     * 获取文件元数据
+     */
+    public FileMetadata getMetadata(String fileId) {
+        if (metadataPersistence == null) {
+            return null;
+        }
+        return metadataPersistence.getById(fileId);
+    }
     
     /**
      * 上传文件（使用默认存储策略）
      */
     public FileMetadata upload(MultipartFile file, String businessType, String businessId) {
-        if (configProvider == null) {
-            throw new RuntimeException("未配置StorageConfigProvider");
-        }
-        
-        StorageConfig config = configProvider.getDefaultConfig();
-        if (config == null) {
-            throw new RuntimeException("未找到默认存储配置");
-        }
-        return upload(file, businessType, businessId, config.getStorageType());
+        return upload(file, businessType, businessId, null, null);
     }
-    
+
+    /**
+     * 上传文件（指定存储策略 + 可见范围）
+     */
+    public FileMetadata upload(MultipartFile file, String businessType, String businessId,
+                               String storageType, Boolean isPrivate) {
+        if (storageType == null) {
+            if (configProvider == null) {
+                throw new RuntimeException("未配置StorageConfigProvider");
+            }
+            StorageConfig config = configProvider.getDefaultConfig();
+            if (config == null) {
+                throw new RuntimeException("未找到默认存储配置");
+            }
+            storageType = config.getStorageType();
+        }
+        return doUpload(file, businessType, businessId, storageType, isPrivate);
+    }
+
     /**
      * 上传文件（指定存储策略）
      */
     public FileMetadata upload(MultipartFile file, String businessType, String businessId, String storageType) {
+        return doUpload(file, businessType, businessId, storageType, null);
+    }
+
+    private FileMetadata doUpload(MultipartFile file, String businessType, String businessId,
+                                  String storageType, Boolean isPrivate) {
         // 验证文件
         validateFile(file, storageType);
         
@@ -95,7 +120,10 @@ public class FileManager {
         
         FileMetadata metadata = storage.upload(file, businessType, businessId);
         metadata.setMd5(md5);
-        
+        if (isPrivate != null) {
+            metadata.setIsPrivate(isPrivate);
+        }
+
         // 持久化元数据
         if (metadataPersistence != null) {
             metadataPersistence.save(metadata);
