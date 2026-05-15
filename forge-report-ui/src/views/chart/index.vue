@@ -16,7 +16,8 @@
         </template>
       </layout-header-pro>
       <n-layout-content class="chart-main" content-style="overflow:hidden; display: flex">
-        <div v-show="getCharts || getLayers" class="chart-left-stack">
+        <div class="chart-left-stack">
+          <content-pages></content-pages>
           <content-charts v-if="getCharts"></content-charts>
           <content-layers v-if="getLayers"></content-layers>
         </div>
@@ -67,6 +68,7 @@ const HeaderLeftBtn = loadAsyncComponent(() => import('./ContentHeader/headerLef
 const HeaderRightBtn = loadAsyncComponent(() => import('./ContentHeader/headerRightBtn/index.vue'))
 const HeaderTitle = loadAsyncComponent(() => import('./ContentHeader/headerTitle/index.vue'))
 const ContentLayers = loadAsyncComponent(() => import('./ContentLayers/index.vue'))
+const ContentPages = loadAsyncComponent(() => import('./ContentPages/index.vue'))
 const ContentCharts = loadAsyncComponent(() => import('./ContentCharts/index.vue'))
 const ContentConfigurations = loadAsyncComponent(() => import('./ContentConfigurations/index.vue'))
 const ContentLoad = loadAsyncComponent(() => import('./ContentLoad/index.vue'))

@@ -16,7 +16,7 @@
 |------|------|------|--------|
 | Task 1 | 多页面协议与兼容工具 | completed | P0 |
 | Task 2 | chartEditStore 多页面状态 | completed | P0 |
-| Task 3 | 编辑器页面管理面板 | pending | P0 |
+| Task 3 | 编辑器页面管理面板 | completed | P0 |
 | Task 4 | 保存、自动保存、预览、发布改造 | pending | P0 |
 | Task 5 | 预览页多页面运行时 | pending | P0 |
 | Task 6 | 组件页面跳转动作配置 | pending | P0 |
@@ -110,6 +110,8 @@ source ~/.nvm/nvm.sh && nvm use v20.19.0 && pnpm build
 
 **目标**: 在 `/chart/home/:id` 工作空间内提供多画布页面管理入口。
 
+**状态**: completed
+
 **涉及文件**:
 - `forge-report-ui/src/views/chart/ContentPages/index.vue` — 新增页面管理面板。
 - `forge-report-ui/src/views/chart/ContentPages/components/PageListItem.vue` — 页面项组件。
@@ -129,6 +131,16 @@ source ~/.nvm/nvm.sh && nvm use v20.19.0 && pnpm build
 - 至少一个页面时禁止删除。
 - 当前页高亮，首页有明确标记。
 - 页面切换不影响画布缩放计算。
+
+**验证**:
+```bash
+source ~/.nvm/nvm.sh && nvm use v20.19.0 && pnpm exec eslint src/views/chart/ContentPages/index.vue src/views/chart/ContentPages/components/PageListItem.vue src/views/chart/index.vue src/store/modules/chartEditStore/chartEditStore.ts
+source ~/.nvm/nvm.sh && nvm use v20.19.0 && pnpm build
+```
+
+**结果**:
+- ESLint 无错误。
+- `pnpm build` 通过；输出的 lottie `eval`、Rollup 循环 chunk、CSS `:deep()`、chunk size 均为既有警告。
 
 ---
 

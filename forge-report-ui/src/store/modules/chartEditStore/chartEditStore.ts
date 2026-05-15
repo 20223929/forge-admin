@@ -384,6 +384,22 @@ export const useChartEditStore = defineStore({
       if (!this.projectPages.some(page => page.id === pageId)) return
       this.homePageId = pageId
     },
+    // * 移动页面排序
+    movePage(pageId: string, direction: 'up' | 'down'): void {
+      this.flushCurrentPage()
+      const index = this.projectPages.findIndex(page => page.id === pageId)
+      if (index === -1) return
+      const targetIndex = direction === 'up' ? index - 1 : index + 1
+      if (targetIndex < 0 || targetIndex >= this.projectPages.length) return
+      const pages = [...this.projectPages]
+      const current = pages[index]
+      pages[index] = pages[targetIndex]
+      pages[targetIndex] = current
+      this.projectPages = pages.map((page, pageIndex) => ({
+        ...page,
+        sort: pageIndex + 1
+      }))
+    },
     // * 设置页面过渡
     setPageTransition(transition: ReportPageTransition): void {
       this.pageTransition = transition
