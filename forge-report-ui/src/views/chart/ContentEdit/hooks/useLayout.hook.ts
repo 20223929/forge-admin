@@ -10,9 +10,10 @@ import { useSync } from '@/views/chart/hooks/useSync.hook'
 const chartEditStore = useChartEditStore()
 
 const applyProjectStorage = async (storage: any, updateComponent: (projectData: any, isReplace?: boolean) => Promise<void>, source: string) => {
-  if (Array.isArray(storage?.componentList)) {
-    console.log(`[useLayout] 从${source}恢复`, storage.componentList.length, '个组件')
-    await updateComponent(storage, true)
+  const pageStorage = chartEditStore.loadProjectStorage(storage)
+  if (Array.isArray(pageStorage?.componentList)) {
+    console.log(`[useLayout] 从${source}恢复页面`, chartEditStore.getActivePageId, pageStorage.componentList.length, '个组件')
+    await updateComponent(pageStorage, true)
     return true
   }
   return false

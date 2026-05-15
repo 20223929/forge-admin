@@ -19,6 +19,14 @@ import {
 import { MenuEnum } from '@/enums/editPageEnum'
 import { getUUID, loadingStart, loadingFinish, loadingError, isString, isArray } from '@/utils'
 import {
+  clonePageWithNewIds,
+  createDefaultPage,
+  extractPageStorage,
+  normalizeProjectStorage,
+  removeInvalidPageActions,
+  updatePageStorage
+} from '@/utils/reportPages'
+import {
   ChartEditStoreEnum,
   ChartEditStorage,
   ChartEditStoreType,
@@ -27,7 +35,10 @@ import {
   TargetChartType,
   RecordChartType,
   RequestGlobalConfigType,
-  EditCanvasConfigType
+  EditCanvasConfigType,
+  ReportCanvasPage,
+  ReportMultiPageStorage,
+  ReportPageTransition
 } from './chartEditStore.d'
 
 const chartHistoryStore = useChartHistoryStore()
@@ -165,7 +176,14 @@ export const useChartEditStore = defineStore({
       }
     },
     // 图表数组（需存储给后端）
-    componentList: []
+    componentList: [],
+    // 项目页面（多画布）状态
+    projectPages: [],
+    activePageId: '',
+    homePageId: '',
+    pageTransition: 'fade',
+    runtimePageContext: {},
+    sharedRequestGlobalConfig: {}
   }),
   getters: {
     getMousePosition(): MousePositionType {
@@ -191,6 +209,21 @@ export const useChartEditStore = defineStore({
     },
     getComponentList(): Array<CreateComponentType | CreateComponentGroupType> {
       return this.componentList
+    },
+    getProjectPages(): ReportCanvasPage[] {
+      return this.projectPages
+    },
+    getActivePageId(): string {
+      return this.activePageId
+    },
+    getHomePageId(): string {
+      return this.homePageId
+    },
+    getPageTransition(): ReportPageTransition {
+      return this.pageTransition
+    },
+    getRuntimePageContext(): Record<string, any> {
+      return this.runtimePageContext
     }
   },
   actions: {
@@ -201,6 +234,163 @@ export const useChartEditStore = defineStore({
         [ChartEditStoreEnum.COMPONENT_LIST]: this.getComponentList.map(normalizeComponentForStorage),
         [ChartEditStoreEnum.REQUEST_GLOBAL_CONFIG]: normalizeRequestGlobalConfigForStorage(this.getRequestGlobalConfig)
       }
+    },
+    // * 获取完整项目多页面存储数据
+    getProjectStorageInfo(): ReportMultiPageStorage {
+      this.flushCurrentPage()
+      const project = normalizeProjectStorage({
+        version: 2,
+        homePageId: this.homePageId,
+        activePageId: this.activePageId,
+        pageTransition: this.pageTransition,
+        pages: cloneDeep(toRaw(this.projectPages)),
+        sharedRequestGlobalConfig: cloneDeep(toRaw(this.sharedRequestGlobalConfig))
+      })
+      this.projectPages = project.pages
+      this.homePageId = project.homePageId
+      this.activePageId = project.activePageId
+      this.pageTransition = project.pageTransition || 'fade'
+      this.sharedRequestGlobalConfig = project.sharedRequestGlobalConfig || {}
+      return project
+    },
+    // * 当前 store 写入单页面画布
+    applyPageStorage(storage: ChartEditStorage): void {
+      this.editCanvasConfig = cloneDeep(storage.editCanvasConfig)
+      this.requestGlobalConfig = cloneDeep(storage.requestGlobalConfig)
+      this.componentList = cloneDeep(storage.componentList)
+      this.setTargetSelectChart()
+    },
+    // * 加载项目多页面数据，返回当前需渲染的单页面画布
+    loadProjectStorage(storage: unknown, initialPageId?: string): ChartEditStorage {
+      const project = normalizeProjectStorage(storage)
+      const activePageId = initialPageId && project.pages.some(page => page.id === initialPageId)
+        ? initialPageId
+        : project.activePageId
+
+      this.projectPages = project.pages
+      this.homePageId = project.homePageId
+      this.activePageId = activePageId
+      this.pageTransition = project.pageTransition || 'fade'
+      this.sharedRequestGlobalConfig = project.sharedRequestGlobalConfig || {}
+
+      const pageStorage = extractPageStorage({ ...project, activePageId }, activePageId)
+      this.applyPageStorage(pageStorage)
+      return pageStorage
+    },
+    // * 将当前画布快照写回当前页面
+    flushCurrentPage(): void {
+      if (!this.projectPages.length) {
+        const page = createDefaultPage(this.getEditCanvasConfig.projectName || '首页')
+        this.projectPages = [page]
+        this.homePageId = page.id
+        this.activePageId = page.id
+      }
+      if (!this.activePageId) {
+        this.activePageId = this.homePageId || this.projectPages[0]?.id || ''
+      }
+      if (!this.activePageId) return
+
+      const project = updatePageStorage(
+        {
+          version: 2,
+          homePageId: this.homePageId || this.activePageId,
+          activePageId: this.activePageId,
+          pageTransition: this.pageTransition,
+          pages: cloneDeep(toRaw(this.projectPages)),
+          sharedRequestGlobalConfig: cloneDeep(toRaw(this.sharedRequestGlobalConfig))
+        },
+        this.activePageId,
+        this.getStorageInfo()
+      )
+      this.projectPages = project.pages
+    },
+    // * 切换当前页面，返回目标页面画布快照
+    switchPage(pageId: string): ChartEditStorage | undefined {
+      if (!this.projectPages.some(page => page.id === pageId)) return undefined
+      this.flushCurrentPage()
+      const project = normalizeProjectStorage({
+        version: 2,
+        homePageId: this.homePageId,
+        activePageId: pageId,
+        pageTransition: this.pageTransition,
+        pages: cloneDeep(toRaw(this.projectPages)),
+        sharedRequestGlobalConfig: cloneDeep(toRaw(this.sharedRequestGlobalConfig))
+      })
+      this.activePageId = pageId
+      const pageStorage = extractPageStorage(project, pageId)
+      this.applyPageStorage(pageStorage)
+      chartHistoryStore.clearBackStack()
+      chartHistoryStore.clearForwardStack()
+      if (this.getEditCanvas.editLayoutDom) {
+        this.computedScale()
+      }
+      return pageStorage
+    },
+    // * 创建空白页面并切换过去
+    createPage(name = '新页面'): string {
+      this.flushCurrentPage()
+      const page = createDefaultPage(name)
+      page.sort = Math.max(0, ...this.projectPages.map(item => item.sort || 0)) + 1
+      this.projectPages.push(page)
+      this.switchPage(page.id)
+      return page.id
+    },
+    // * 复制页面并切换过去
+    duplicatePage(pageId: string): string | undefined {
+      this.flushCurrentPage()
+      const source = this.projectPages.find(page => page.id === pageId)
+      if (!source) return undefined
+      const page = clonePageWithNewIds(source)
+      page.sort = Math.max(0, ...this.projectPages.map(item => item.sort || 0)) + 1
+      this.projectPages.push(page)
+      this.switchPage(page.id)
+      return page.id
+    },
+    // * 删除页面，至少保留一个页面
+    deletePage(pageId: string): void {
+      if (this.projectPages.length <= 1) return
+      this.flushCurrentPage()
+      const index = this.projectPages.findIndex(page => page.id === pageId)
+      if (index === -1) return
+
+      const nextProject = removeInvalidPageActions(this.getProjectStorageInfo(), pageId)
+      nextProject.pages.splice(index, 1)
+      const fallbackPage = nextProject.pages[index] || nextProject.pages[index - 1] || nextProject.pages[0]
+
+      if (nextProject.homePageId === pageId) {
+        nextProject.homePageId = fallbackPage.id
+      }
+      if (nextProject.activePageId === pageId) {
+        nextProject.activePageId = fallbackPage.id
+      }
+
+      this.projectPages = nextProject.pages
+      this.homePageId = nextProject.homePageId
+      this.activePageId = nextProject.activePageId
+      this.sharedRequestGlobalConfig = nextProject.sharedRequestGlobalConfig || {}
+
+      this.applyPageStorage(extractPageStorage(nextProject, this.activePageId))
+    },
+    // * 重命名页面
+    renamePage(pageId: string, name: string): void {
+      const nextName = name.trim()
+      if (!nextName) return
+      const target = this.projectPages.find(page => page.id === pageId)
+      if (!target) return
+      target.name = nextName
+    },
+    // * 设置首页
+    setHomePage(pageId: string): void {
+      if (!this.projectPages.some(page => page.id === pageId)) return
+      this.homePageId = pageId
+    },
+    // * 设置页面过渡
+    setPageTransition(transition: ReportPageTransition): void {
+      this.pageTransition = transition
+    },
+    // * 设置运行时下钻上下文
+    setRuntimePageContext(context: Record<string, any>): void {
+      this.runtimePageContext = cloneDeep(context || {})
     },
     // * 获取针对 componentList 顺序排过序的 selectId
     getSelectIdSortList(ids?: string[]): string[] {

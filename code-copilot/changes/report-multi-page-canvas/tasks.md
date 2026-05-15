@@ -15,7 +15,7 @@
 | Task | 名称 | 状态 | 优先级 |
 |------|------|------|--------|
 | Task 1 | 多页面协议与兼容工具 | completed | P0 |
-| Task 2 | chartEditStore 多页面状态 | pending | P0 |
+| Task 2 | chartEditStore 多页面状态 | completed | P0 |
 | Task 3 | 编辑器页面管理面板 | pending | P0 |
 | Task 4 | 保存、自动保存、预览、发布改造 | pending | P0 |
 | Task 5 | 预览页多页面运行时 | pending | P0 |
@@ -68,6 +68,8 @@ source ~/.nvm/nvm.sh && nvm use v20.19.0 && pnpm build
 
 **目标**: Store 支持项目页面列表、当前页面、首页、页面切换和项目级保存快照。
 
+**状态**: completed
+
 **涉及文件**:
 - `forge-report-ui/src/store/modules/chartEditStore/chartEditStore.ts` — 增加多页面 state/getters/actions。
 - `forge-report-ui/src/store/modules/chartEditStore/chartEditStore.d.ts` — 增加 store 类型定义。
@@ -91,6 +93,16 @@ setHomePage(pageId: string): void
 - 切换页面前当前页面改动不会丢失。
 - 切换页面后画布尺寸、背景、组件列表、请求配置正确恢复。
 - 删除当前页后能自动切换到相邻页面或首页。
+
+**验证**:
+```bash
+source ~/.nvm/nvm.sh && nvm use v20.19.0 && pnpm exec eslint src/store/modules/chartEditStore/chartEditStore.ts src/store/modules/chartEditStore/chartEditStore.d.ts src/views/chart/ContentEdit/hooks/useLayout.hook.ts src/views/preview/utils/storage.ts src/utils/reportPages.ts
+source ~/.nvm/nvm.sh && nvm use v20.19.0 && pnpm build
+```
+
+**结果**:
+- ESLint 无错误。
+- `pnpm build` 通过；输出的 lottie `eval`、Rollup 循环 chunk、CSS `:deep()`、chunk size 均为既有警告。
 
 ---
 

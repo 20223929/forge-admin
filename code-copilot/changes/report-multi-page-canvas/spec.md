@@ -156,7 +156,7 @@
 | Task | 状态 | 实际改动文件 | 备注 |
 |------|------|--------------|------|
 | Task 1 | done | `forge-report-ui/src/store/modules/chartEditStore/chartEditStore.d.ts`, `forge-report-ui/src/packages/index.d.ts`, `forge-report-ui/src/packages/public/publicConfig.ts`, `forge-report-ui/src/views/chart/hooks/useSync.hook.ts`, `forge-report-ui/src/utils/reportPages.ts` | 多页面协议、结构化动作类型、旧组件 actions 兼容、协议工具；`pnpm build` 通过 |
-| Task 2 | pending | - | Store 多页面状态 |
+| Task 2 | done | `forge-report-ui/src/store/modules/chartEditStore/chartEditStore.ts`, `forge-report-ui/src/store/modules/chartEditStore/chartEditStore.d.ts`, `forge-report-ui/src/views/chart/ContentEdit/hooks/useLayout.hook.ts`, `forge-report-ui/src/views/preview/utils/storage.ts` | Store 增加页面列表、首页、当前页、页面上下文与切换动作；编辑/预览加载接入多页面协议；`pnpm build` 通过 |
 | Task 3 | pending | - | 编辑器页面管理 UI |
 | Task 4 | pending | - | 保存、预览、发布改造 |
 | Task 5 | pending | - | 预览运行时页面切换 |

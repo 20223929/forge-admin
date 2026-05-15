@@ -274,6 +274,12 @@ export interface ChartEditStoreType {
   [ChartEditStoreEnum.RECORD_CHART]?: RecordChartType
   [ChartEditStoreEnum.REQUEST_GLOBAL_CONFIG]: RequestGlobalConfigType
   [ChartEditStoreEnum.COMPONENT_LIST]: Array<CreateComponentType | CreateComponentGroupType>
+  projectPages: ReportCanvasPage[]
+  activePageId: string
+  homePageId: string
+  pageTransition: ReportPageTransition
+  runtimePageContext: Record<string, any>
+  sharedRequestGlobalConfig: Partial<RequestGlobalConfigType>
 }
 
 // 存储数据类型
